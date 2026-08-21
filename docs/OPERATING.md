@@ -72,6 +72,27 @@ worse than no plan, because it is actionable.
 
 ---
 
+## Before you trust any of these numbers
+
+There is one test in the suite worth knowing about by name:
+`test_reference_model_scores_one_against_its_own_trajectories`.
+
+It takes the hand-written reference model, generates trajectories from it, turns
+those into unit tests, and runs them back against the same model. The score must
+be exactly 1.00. A measuring instrument has to read zero on a known-zero input
+before any reading it gives you means anything.
+
+It did not, at first. It read 0.20. Two bookkeeping mistakes — replay re-rolling
+the chance player instead of replaying what was recorded, and two posts sharing
+a `utm_content` — meant a *perfect* model could not score above roughly 0.35.
+Every downstream number inherited it: refinement could never reach its early
+stop, so a run would burn its whole call budget, and accuracy sat on a scale
+whose maximum nobody knew.
+
+Neither mistake was visible from the outputs. Both were visible immediately from
+this test, once it existed. If you fork this and change anything in
+`cwm/tests_from_traj.py` or `cwm/reference.py`, that test is the one to watch.
+
 ## What good looks like
 
 | Metric | Healthy | Worrying |

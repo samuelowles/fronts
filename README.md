@@ -112,6 +112,21 @@ programmatically rather than by inspection.
 
 ---
 
+## Status
+
+The game, world-model and solver layers are built and tested — 165 tests, no
+runtime dependencies, `ruff` clean. **The Composio adapter and the CLI are not
+built yet**, so the commands below describe the intended surface rather than
+something you can run today; `examples/` and `blotto plan` are the next
+milestone. Everything under `src/blotto/` works and is exercised by the suite.
+
+The sandbox that executes synthesised code was independently reviewed and found
+fully escapable in its first form — an allowlist of *modules* cannot hold,
+because module objects form a reachable graph and `random._os` is the real `os`.
+It now refuses imports outright and binds values instead, with the nine verified
+escapes kept as regression tests. Anything running genuinely untrusted synthesis
+output should still use `SubprocessSandbox` or a container.
+
 ## Install
 
 ```bash
