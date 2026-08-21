@@ -26,16 +26,18 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = [
-    "numpy>=1.26",
-    "pydantic>=2.6",
-    "typer>=0.12",
-    "rich>=13.7",
-]
+# The core game, world-model and solver layers depend on nothing outside the
+# standard library. That is a deliberate constraint, not an accident of youth:
+# a planner with a numpy dependency is a planner people cannot drop into a
+# Lambda, and a repository that needs a wheel built before it will tell you
+# anything is a repository nobody evaluates. Extras buy you provider clients
+# and a prettier CLI, and nothing else.
+dependencies = []
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.40", "openai>=1.40"]
 platforms = ["composio>=0.8"]
+cli = ["typer>=0.12", "rich>=13.7"]
 dev = [
     "pytest>=8.0",
     "pytest-timeout>=2.2",
@@ -43,6 +45,7 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
 ]
+all = ["blotto[llm,platforms,cli]"]
 
 [project.scripts]
 blotto = "blotto.cli:app"
