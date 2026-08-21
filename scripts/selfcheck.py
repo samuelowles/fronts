@@ -58,6 +58,12 @@ from blotto.game.types import (
     SemanticTier,
 )
 
+from blotto.solvers.blotto import BlottoAllocator, BlottoConfig, Front
+from blotto.solvers.congestion import CongestionGame
+from blotto.solvers.exp3 import EXP3, EXP3Config
+from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig
+from blotto.solvers.signalling import SignalCost, separates
+
 CHECKS: list[Callable[[], None]] = []
 
 
@@ -353,6 +359,143 @@ def worked_economics_example() -> None:
     assert health(3.0) is PayoffHealth.GOLDEN
     assert abs(cac_payback_months(65.0, economics) - 0.8125) < 1e-9
     assert Economics.__dataclass_fields__["allowable_cac_share"].default == 0.30
+
+
+
+
+# ===== solvers ===============================================================
+
+# -- a minimal world model for the ISMCTS checks -------------------------------
+#
+# One decision with a hidden quality gating a rarely-legal action, then one
+# chance draw, then a terminal reward. Expected values: good_move 1.025,
+# rare_move 0.925, bad_move 0.225, so the known-optimal move is good_move.
+# Defined inline because selfcheck must not import from tests/.
+
+
+class _ToyWorld:
+    def initial_state(self) -> dict:
+        return {"q": None, "phase": "decide", "move": None, "bonus": 0.0}
+
+    def apply_action(self, state: dict, action: str) -> dict:
+        successor = dict(state)
+        if successor["phase"] == "decide":
+            successor["phase"] = "chance"
+            successor["move"] = action
+        else:
+            successor["phase"] = "done"
+            successor["bonus"] = 0.1 if action == "boost" else 0.0
+        return successor
+
+    def get_current_player(self, state: dict) -> int:
+        if state["phase"] == "decide":
+            return 0
+        if state["phase"] == "chance":
+            return -1
+        return -4
+
+    def get_legal_actions(self, state: dict) -> list[str]:
+        if state["phase"] != "decide":
+            return []
+        if state["q"] == "bad":
+            return ["good_move", "bad_move"]
+        return ["good_move", "bad_move", "rare_move"]
+
+    def get_observations(self, state: dict) -> dict:
+        return {0: None}
+
+    def get_rewards(self, state: dict) -> dict:
+        if state["phase"] != "done":
+            return {0: 0.0}
+        base = {"good_move": 1.0, "bad_move": 0.2, "rare_move": 0.9}
+        return {0: base[state["move"]] + state["bonus"]}
+
+    def chance_outcomes(self, state: dict) -> list:
+        return [("boost", 0.25), ("normal", 0.75)]
+
+
+class _ToyInference:
+    """q good with p=0.3, reproducible per call index so plan runs repeat."""
+
+    def __init__(self) -> None:
+        self._calls = 0
+
+    def resample_state(self, history: object, player_id: int) -> dict:
+        rng = random.Random(1234 + self._calls)
+        self._calls += 1
+        q = "good" if rng.random() < 0.3 else "bad"
+        return {"q": q, "phase": "decide", "move": None, "bonus": 0.0}
+
+
+@check
+def ismcts_deterministic_under_seed() -> None:
+    world = _ToyWorld()
+    first = ISMCTS(ISMCTSConfig(seed=42), inference=_ToyInference()).plan(
+        world, world.initial_state(), 0, 300
+    )
+    second = ISMCTS(ISMCTSConfig(seed=42), inference=_ToyInference()).plan(
+        world, world.initial_state(), 0, 300
+    )
+    assert first.move == second.move, "ISMCTS move differs across identical runs"
+    assert first.visits == second.visits, (
+        f"visit counts differ: {first.visits} vs {second.visits}"
+    )
+    assert first.move == "good_move", f"expected the known-optimal move, got {first.move}"
+
+
+@check
+def blotto_allocations_sum_exactly() -> None:
+    fronts = [
+        Front("ig", "f1", "v1", 10.0),
+        Front("tt", "f2", "v2", 6.0),
+        Front("x", "f3", "v1", 4.0),
+    ]
+    for units in (0, 1, 5, 10):
+        allocator = BlottoAllocator(BlottoConfig(units=units, seed=units))
+        for allocation, probability in allocator.equilibrium_mixture(fronts, 100):
+            total = sum(allocation.values())
+            assert total == units, f"allocation sums to {total}, expected {units}"
+            assert all(count >= 0 for count in allocation.values()), "negative allocation"
+            assert 0.0 < probability <= 1.0
+        response = allocator.pure_best_response(fronts, {f: 1 for f in fronts})
+        assert sum(response.values()) == units
+
+
+@check
+def exp3_probabilities_sum_to_one() -> None:
+    exp3 = EXP3(["alpha", "beta", "gamma"], EXP3Config(gamma=0.15))
+    rng = random.Random(2)
+    rewards = {"alpha": 0.3, "beta": 0.6, "gamma": 0.9}
+    for _ in range(2000):
+        total = sum(exp3.probabilities().values())
+        assert abs(total - 1.0) < 1e-9, f"probabilities sum to {total}"
+        arm = exp3.select(rng)
+        exp3.update(arm, rewards[arm])
+    assert abs(sum(exp3.probabilities().values()) - 1.0) < 1e-9
+
+
+@check
+def congestion_best_response_terminates_at_nash() -> None:
+    game = CongestionGame(
+        players=["p1", "p2", "p3", "p4"],
+        angle_payoffs={"benchmark": 1.0, "niche_a": 0.8, "niche_b": 0.7},
+    )
+    converged = game.best_response_dynamics({p: "benchmark" for p in game.players})
+    assert game.is_nash(converged), f"dynamics stopped at a non-Nash profile: {converged}"
+
+
+@check
+def separating_condition_known_case() -> None:
+    credible = SignalCost(
+        cost_high_type=1.0, cost_low_type=5.0, gain_from_deception=3.0,
+        benefit_high_type=4.0,
+    )
+    assert separates(credible), "expensive-to-fake claim should separate"
+    cheap = SignalCost(
+        cost_high_type=1.0, cost_low_type=1.0, gain_from_deception=4.0,
+        benefit_high_type=4.0,
+    )
+    assert not separates(cheap), "cheap-to-fake claim must not separate"
 
 
 def main() -> int:
