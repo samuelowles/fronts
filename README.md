@@ -173,6 +173,7 @@ says so in its own docstring.
 |---|---|
 | [`docs/GAME.md`](docs/GAME.md) | The formal game: players, hidden state, observation model, payoffs, solution concepts, known failures |
 | [`docs/PAPER.md`](docs/PAPER.md) | The Code World Models translation — what transfers, what doesn't, and two errata in the original |
+| [`docs/OPERATING.md`](docs/OPERATING.md) | The daily and weekly loop, the cold-start floor, and what to do when the model is bad |
 
 ---
 
