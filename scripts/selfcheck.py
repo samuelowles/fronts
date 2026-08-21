@@ -498,6 +498,96 @@ def separating_condition_known_case() -> None:
     assert not separates(cheap), "cheap-to-fake claim must not separate"
 
 
+
+# ===== code world models =====================================================
+
+@check
+def cwm_sandbox_blocks_forbidden_import() -> None:
+    """The sandbox refuses ``import os`` and dunder attribute access at
+    compile time, naming the offending node and its line."""
+    from blotto.cwm.sandbox import Sandbox, SandboxConfig, SandboxViolation
+
+    for source in ("import os", "x = object.__subclasses__()"):
+        try:
+            Sandbox().load(source, SandboxConfig())
+        except SandboxViolation as exc:
+            assert "line 1" in str(exc), f"must name the line: {exc}"
+        else:
+            raise AssertionError(f"sandbox must refuse {source!r}")
+
+
+@check
+def cwm_reference_reaches_terminal() -> None:
+    """The reference world model plays a full episode to a terminal state,
+    producing settled observations along the way."""
+    import random
+
+    from blotto.game.types import TERMINAL_PLAYER
+
+    from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
+
+    model = ReferenceWorldModel(ReferenceConfig(horizon=6))
+    state = model.initial_state()
+    rng = random.Random(5)
+    plies = 0
+    while model.get_current_player(state) != TERMINAL_PLAYER and plies < 200:
+        if model.get_current_player(state) == -1:
+            outcomes = model.chance_outcomes(state)
+            action = rng.choices(
+                [key for key, _ in outcomes],
+                weights=[prob for _, prob in outcomes],
+                k=1,
+            )[0]
+        else:
+            legal = model.get_legal_actions(state)
+            assert legal, "no legal actions mid-episode"
+            action = next(
+                (key for key in legal if key.startswith("publish")), legal[0]
+            )
+        state = model.apply_action(state, action)
+        plies += 1
+    assert model.get_current_player(state) == TERMINAL_PLAYER
+    assert state["log"], "a publishing policy must produce observations"
+
+
+@check
+def cwm_observations_carry_no_hidden_state() -> None:
+    """No player's observation exposes theta, standing, saturation, belief
+    or fatigue -- the operator sees the degraded dashboard and nothing else."""
+    from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
+
+    model = ReferenceWorldModel(ReferenceConfig(horizon=3))
+    state = model.initial_state()
+    legal = [
+        key for key in model.get_legal_actions(state) if key.startswith("publish")
+    ]
+    state = model.apply_action(state, legal[0])
+    outcomes = model.chance_outcomes(state)
+    state = model.apply_action(state, outcomes[0][0])
+    for player, observation in model.get_observations(state).items():
+        fields = set(observation.__dataclass_fields__)
+        leaked = fields & {"theta", "standing", "saturation", "belief", "asset_fatigue"}
+        assert not leaked, f"player {player} observation leaks {leaked}"
+
+
+@check
+def cwm_refinement_selection_is_deterministic() -> None:
+    """The same seed selects the same refinement node sequence, and Beta
+    sampling favours the high-pass-rate node in aggregate."""
+    import random
+
+    from blotto.cwm.refine import RefinementNode, RefinementTree
+
+    tree = RefinementTree(
+        nodes=[RefinementNode("good", 0.9), RefinementNode("bad", 0.1)]
+    )
+    first = [tree.select(random.Random(42)).source for _ in range(50)]
+    second = [tree.select(random.Random(42)).source for _ in range(50)]
+    assert first == second, "selection must be reproducible under a seed"
+    wins = sum(1 for _ in range(1000) if tree.select(random.Random(7)).source == "good")
+    assert wins > 900, f"high-h node should dominate; won {wins}/1000"
+
+
 def main() -> int:
     failures: list[tuple[str, str]] = []
     for fn in CHECKS:
