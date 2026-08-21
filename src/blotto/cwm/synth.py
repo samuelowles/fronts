@@ -14,7 +14,7 @@ import json
 from dataclasses import dataclass, field
 
 from blotto.cwm.llm import LLMClient, extract_code
-from blotto.cwm.sandbox import Sandbox, SandboxConfig, instantiate
+from blotto.cwm.sandbox import Sandbox, SandboxConfig, default_namespace, instantiate
 from blotto.cwm.tests_from_traj import ModelTest, TestResult
 from blotto.game.action_space import ActionCodec
 from blotto.game.types import Trajectory
@@ -115,14 +115,23 @@ def build_prompt(
     words of natural-language diagnosis.
     """
     api = api_spec if api_spec is not None else default_api_spec()
+    # Tell the synthesiser what is bound rather than what is permitted. The
+    # sandbox refuses every import statement, so a prompt phrased as "these
+    # modules are allowed" invites code that cannot load and burns a refinement
+    # round rediscovering it. Naming the bindings steers the first attempt.
+    bound = ", ".join(sorted(default_namespace()))
     system = (
         "You are a program synthesiser. You write complete, runnable Python "
         "simulators of an organic content-distribution environment, conforming "
         "exactly to a required API. You write code, not explanations. Your "
-        "output is executed in a sandbox that allows only these modules: "
-        + ", ".join(sorted(SandboxConfig().allowed_modules))
-        + ". All methods must be deterministic functions of their arguments; "
-        "randomness enters only through the chance player."
+        "output runs in a sandbox that permits NO import statements at all. "
+        "These names are already bound in your module's namespace and are the "
+        "only ones available: "
+        + bound
+        + ". Do not write `import` or `from ... import` anywhere; it will be "
+        "rejected before execution. All methods must be deterministic "
+        "functions of their arguments; randomness enters only through the "
+        "chance player."
     )
     user_lines = [
         "Write a Python module implementing a world model of the environment "

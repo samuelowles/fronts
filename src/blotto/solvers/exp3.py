@@ -33,8 +33,8 @@ from __future__ import annotations
 
 import math
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 __all__ = ["EXP3Config", "EXP3PConfig", "EXP3", "EXP3P", "regret_bound"]
 

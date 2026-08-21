@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 
 from blotto.cwm.llm import LLMClient
 from blotto.cwm.sandbox import Sandbox, SandboxConfig, instantiate
-from blotto.cwm.synth import SynthConfig, WORLD_MODEL_CLASS, synthesise
+from blotto.cwm.synth import WORLD_MODEL_CLASS, SynthConfig, synthesise
 from blotto.cwm.tests_from_traj import ModelTest, TestResult
 from blotto.game.types import Trajectory
 

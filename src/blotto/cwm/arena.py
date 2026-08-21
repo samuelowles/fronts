@@ -24,9 +24,8 @@ held fixed so the comparison measures the agent and not the lottery.
 from __future__ import annotations
 
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Sequence
 
 from blotto.game.types import (
     CHANCE_PLAYER,

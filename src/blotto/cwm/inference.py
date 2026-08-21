@@ -32,6 +32,7 @@ not exist here: there is no offline record of hidden state to learn from.
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from blotto.cwm.llm import LLMClient, extract_code
@@ -44,6 +45,7 @@ from blotto.cwm.synth import SynthConfig
 from blotto.cwm.tests_from_traj import Tolerance
 from blotto.game.types import (
     CHANCE_PLAYER,
+    OPERATOR,
     TERMINAL_PLAYER,
     ActionKey,
     Observation,
@@ -233,6 +235,7 @@ def validate_history(
     model: CodeWorldModel,
     sampled_history: list[ActionKey],
     observations: list[Observation],
+    chance: Sequence[ActionKey] | None = None,
 ) -> bool:
     """Replay ``sampled_history`` through ``model`` and confirm every
     recorded observation is reproduced.
@@ -243,25 +246,44 @@ def validate_history(
     only at a place the data does not rule out (PAPER.md s6). Chance nodes
     are sampled with a fixed seed so the check is deterministic; the seed is
     part of the test, not part of the claim.
+
+    Note where the loop stops. Exhausting the action list is not the end of the
+    replay: the last operator move still has a chance ply after it, and that
+    ply is what resolves the final publish into an observation. Breaking on the
+    action list at the top of the loop skipped it, so a model asked to validate
+    its OWN recorded history returned False at horizon 10 and True at 6 and 20 --
+    a bug that looks exactly like a horizon-dependent modelling weakness and is
+    an off-by-one. We continue until the model says terminal, or nothing is left
+    to resolve.
     """
     seen: dict[str, Observation] = {}
     rng = random.Random(0)
+    pending = list(chance or ())
     cursor = model.initial_state()
     index = 0
     plies = 0
     while plies < 10_000:
         plies += 1
         player = model.get_current_player(cursor)
-        if player == TERMINAL_PLAYER or index >= len(sampled_history):
+        if player == TERMINAL_PLAYER:
+            break
+        if player != CHANCE_PLAYER and index >= len(sampled_history):
             break
         if player == CHANCE_PLAYER:
             outcomes = model.chance_outcomes(cursor)
             if not outcomes:
                 break
-            action = rng.choices(
-                [key for key, _ in outcomes],
-                weights=[prob for _, prob in outcomes],
-                k=1,
+            keys = [key for key, _ in outcomes]
+            # Replay the recorded draw where we have one. Re-rolling here
+            # compares the model against a branch that never happened, which is
+            # the same defect that made transition tests unmeasurable.
+            drawn: ActionKey | None = None
+            while pending and drawn is None:
+                candidate = pending.pop(0)
+                if candidate in keys:
+                    drawn = candidate
+            action = drawn if drawn is not None else rng.choices(
+                keys, weights=[prob for _, prob in outcomes], k=1
             )[0]
         else:
             action = sampled_history[index]
@@ -296,17 +318,30 @@ def inference_accuracy(
     model: CodeWorldModel,
     inference: StateInference | HistoryInference,
     trajectories: list[Trajectory],
+    mode: str = "state",
+    tolerance: Tolerance | None = None,
 ) -> float:
     """Fraction of settled observations the inference+CWM autoencoder
     reproduces.
 
-    For a ``StateInference``: resample a state from the history up to each
-    step, read the model's observation there, compare to what was recorded.
-    For a ``HistoryInference``: resample a full history and validate it.
-    Either way the unit is the observation, because the observation is the
-    only thing both sides can see."""
+    ``mode`` is explicit and required in spirit, because sniffing for a
+    ``resample_history`` attribute silently mis-dispatched every sampler that
+    defines both methods -- ``FallbackInference`` among them -- down the history
+    path, where its empty sample failed validation immediately and the function
+    returned 0.0 for everything, forever.
+
+    The comparison is on METRICS within ``tolerance``, not on identifier
+    equality. Matching ``utm_content`` only asks whether the reconstructed state
+    is pointing at the right post, which any state carrying an empty log fails
+    and no state carrying the right log can fail informatively. The question
+    worth asking is whether replaying the sampled state through the model
+    reproduces the numbers that were actually seen.
+    """
     from blotto.game.action_space import ActionCodec
 
+    if mode not in {"state", "history"}:
+        raise ValueError(f"mode must be 'state' or 'history', got {mode!r}")
+    tol = tolerance if tolerance is not None else _VALIDATION_TOLERANCE
     codec = ActionCodec()
     total = 0
     matched = 0
@@ -314,20 +349,40 @@ def inference_accuracy(
         history: list[tuple[Observation | None, ActionKey | None]] = []
         for step in trajectory.steps:
             action = codec.encode(step.move)
-            if step.observation is not None and not step.observation.is_partial:
+            recorded = step.observation
+            if recorded is not None and not recorded.is_partial:
                 total += 1
-                if isinstance(inference, HistoryInference) or hasattr(
-                    inference, "resample_history"
-                ):
-                    sampled = inference.resample_history(history, 0)  # type: ignore[attr-defined]
-                    ok = validate_history(model, sampled, [step.observation])
-                else:
-                    state = inference.resample_state(history, 0)  # type: ignore[attr-defined]
-                    predicted = model.get_observations(state).get(0)
-                    ok = (
-                        predicted is not None
-                        and predicted.utm_content == step.observation.utm_content
+                if mode == "history":
+                    sampled = inference.resample_history(history, OPERATOR)  # type: ignore[union-attr]
+                    ok = validate_history(
+                        model, sampled, [recorded], trajectory.chance
                     )
+                else:
+                    state = inference.resample_state(history, OPERATOR)  # type: ignore[union-attr]
+                    ok = _reproduces(model, state, recorded, tol)
                 matched += 1 if ok else 0
-            history.append((step.observation, action))
+            history.append((recorded, action))
     return matched / total if total else 0.0
+
+
+def _reproduces(
+    model: CodeWorldModel,
+    state: State,
+    recorded: Observation,
+    tolerance: Tolerance,
+) -> bool:
+    """Does the model, read at ``state``, reproduce ``recorded`` within
+    tolerance? Any failure to read the state at all counts as a miss, because a
+    sampler whose output the model cannot interpret is not a working sampler."""
+    try:
+        predicted = model.get_observations(state).get(OPERATOR)
+    except Exception:
+        return False
+    if predicted is None or predicted.utm_content != recorded.utm_content:
+        return False
+    return all(
+        tolerance.allows(
+            metric, float(getattr(predicted, metric)), float(getattr(recorded, metric))
+        )
+        for metric in ("reach", "impressions", "attributed_conversions", "hook_rate")
+    )

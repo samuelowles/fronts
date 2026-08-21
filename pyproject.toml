@@ -72,6 +72,14 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = [
+    # UP042 wants StrEnum. The action-space enums deliberately inherit from
+    # (str, Enum) instead: their members are serialised into ActionKey strings
+    # and compared against raw strings decoded from stored trajectories, and
+    # that idiom works identically on 3.10, which is what several contributors
+    # will actually run despite the floor below.
+    "UP042",
+]
 
 [tool.mypy]
 python_version = "3.11"

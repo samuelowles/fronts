@@ -32,12 +32,14 @@ from __future__ import annotations
 
 import random
 import traceback
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 from blotto.game.action_space import ActionCodec
 from blotto.game.types import (
     CHANCE_PLAYER,
+    OPERATOR,
     TERMINAL_PLAYER,
     ActionKey,
     Observation,
@@ -93,11 +95,18 @@ class Tolerance:
     Counts are noisy in proportion (a viral tail dominates any sum of
     impressions); rates are bounded estimators whose whole information
     content is the ratio, so the same relative error means something much
-    worse. Defaults: counts 0.25, rates 0.10.
+    worse.
+
+    The defaults were 0.25 and 0.10 while replay re-sampled chance, and had to
+    be that wide to absorb a +/-50% response bucket the model had no way to
+    predict. That was a tolerance concealing a broken measurement rather than
+    accommodating real variance. With chance replayed from the recording
+    (``Trajectory.chance``) the remaining error is genuinely the model's, so the
+    thresholds tighten to where a wrong model actually fails.
     """
 
-    counts: float = 0.25
-    rates: float = 0.10
+    counts: float = 0.05
+    rates: float = 0.02
 
     def allows(self, metric: str, predicted: float, actual: float) -> bool:
         is_rate = metric in _RATE_METRICS
@@ -129,26 +138,38 @@ def _metrics(observation: Observation) -> dict[str, float]:
 _ALL_METRICS: tuple[str, ...] = _COUNT_METRICS + _RATE_METRICS
 
 
-def replay(
+def replay_traced(
     model: CodeWorldModel,
     actions: list[ActionKey],
     seed: int,
+    chance: Sequence[ActionKey] | None = None,
     max_plies: int = 10_000,
-) -> State:
-    """Walk ``actions`` through ``model``, sampling chance nodes with a
-    seeded rng, and return the state after the last one.
+) -> tuple[State, bool]:
+    """Walk ``actions`` through ``model`` and return ``(state, degraded)``.
 
-    Chance draws cannot be replayed from the trajectory -- which moves the
-    chance player made is invisible to the operator, and that is the point of
-    closed deck. The seed makes a test reproducible without making it
-    correct: a model can still land on a different bucket than the recording
-    did, which is why transition tests carry tolerance and the pass rate,
-    not the pass, is the signal.
+    Recorded chance outcomes are consumed in temporal order. This is what makes
+    a transition test a measurement rather than a coin flip: transitions are
+    deterministic given the chance action, so replaying the recorded one
+    compares the model's prediction against a recording made under the same
+    branch. Drawing a fresh one instead scores the difference between two
+    branches as model error, which is how the reference model came to fail 70%
+    of tests generated from its own trajectories.
+
+    ``degraded`` is True when the recorded outcomes ran out and a draw had to be
+    sampled. A degraded test is still worth running and is not worth trusting,
+    so callers surface the flag rather than silently averaging it in.
+
+    A model may legitimately reach chance nodes at different points than the
+    recording did -- that is itself a modelling error, and one worth seeing. If
+    a recorded outcome is not legal at the node reached, we fall back to
+    sampling and mark the test degraded rather than forcing an invalid action.
     """
     rng = random.Random(seed)
+    pending = list(chance or ())
     state = model.initial_state()
     index = 0
     plies = 0
+    degraded = False
     while plies < max_plies:
         plies += 1
         player = model.get_current_player(state)
@@ -158,23 +179,96 @@ def replay(
             outcomes = model.chance_outcomes(state)
             if not outcomes:
                 break
-            action = rng.choices(
-                [key for key, _ in outcomes],
-                weights=[prob for _, prob in outcomes],
-                k=1,
-            )[0]
+            keys = [key for key, _ in outcomes]
+            action: ActionKey | None = None
+            while pending and action is None:
+                candidate = pending.pop(0)
+                if candidate in keys:
+                    action = candidate
+            if action is None:
+                degraded = True
+                action = rng.choices(
+                    keys, weights=[prob for _, prob in outcomes], k=1
+                )[0]
             state = model.apply_action(state, action)
             continue
         if index >= len(actions):
             break
         state = model.apply_action(state, actions[index])
         index += 1
+    return state, degraded
+
+
+def replay(
+    model: CodeWorldModel,
+    actions: list[ActionKey],
+    seed: int,
+    chance: Sequence[ActionKey] | None = None,
+    max_plies: int = 10_000,
+) -> State:
+    """``replay_traced`` without the degradation flag, for callers that do not
+    report it."""
+    state, _ = replay_traced(model, actions, seed, chance, max_plies)
     return state
+
+
+def _without_utm(action: ActionKey) -> str:
+    """An action key with its tracking id stripped, for identity comparisons
+    where the tracking id is not part of what is being compared."""
+    return "|".join(
+        part for part in str(action).split("|") if not part.startswith("utm=")
+    )
 
 
 def _operator_observation(model: CodeWorldModel, state: State) -> Observation:
     observations = model.get_observations(state)
-    return observations[0]
+    return observations[OPERATOR]
+
+
+def settle(
+    model: CodeWorldModel,
+    state: State,
+    max_plies: int = 32,
+) -> tuple[State, Observation]:
+    """Advance until the latest operator observation stops being provisional.
+
+    A recorded trajectory stores what an operator eventually SAW, and what they
+    eventually saw is the settled number -- metrics inside the 24-72h reporting
+    window are provisional and are excluded from test generation for exactly
+    that reason. Replaying only up to the moment of publication therefore reads
+    a different quantity than the one recorded: in the reference model the
+    provisional reach for a post is 2304 where the settled figure is 705, a
+    factor of three that has nothing to do with model quality.
+
+    So the comparison has to be made at the same point in the lifecycle. We
+    advance chance plies, and spend operator plies on ``hold`` where one is
+    legal, because holding passes time without publishing something new that
+    would displace the observation under test.
+
+    Bounded, and gives up quietly: a candidate model that never settles anything
+    simply gets compared on what it does report, and fails on the metrics, which
+    is the correct outcome for a model that cannot represent a reporting lag.
+    """
+    observation = _operator_observation(model, state)
+    for _ in range(max_plies):
+        if not observation.is_partial:
+            break
+        player = model.get_current_player(state)
+        if player == TERMINAL_PLAYER:
+            break
+        if player == CHANCE_PLAYER:
+            outcomes = model.chance_outcomes(state)
+            if not outcomes:
+                break
+            state = model.apply_action(state, max(outcomes, key=lambda o: o[1])[0])
+        else:
+            legal = model.get_legal_actions(state)
+            hold = next((a for a in legal if a.startswith("hold")), None)
+            if hold is None:
+                break
+            state = model.apply_action(state, hold)
+        observation = _operator_observation(model, state)
+    return state, observation
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,8 +310,10 @@ class ModelTest:
 
     def _run_reconstruction(self, model: CodeWorldModel) -> TestResult:
         actions = [ActionKey(a) for a in self.payload["actions"]]
-        state = replay(model, actions, self.payload["seed"])
-        predicted = _operator_observation(model, state)
+        state, degraded = replay_traced(
+            model, actions, self.payload["seed"], self.payload.get("chance")
+        )
+        state, predicted = settle(model, state)
         recorded = self.payload["expected"]
         if predicted.utm_content != recorded["utm_content"]:
             return TestResult(
@@ -241,8 +337,10 @@ class ModelTest:
     def _run_transition(self, model: CodeWorldModel) -> TestResult:
         prefix = [ActionKey(a) for a in self.payload["prefix"]]
         action = ActionKey(self.payload["action"])
-        state = replay(model, [*prefix, action], self.payload["seed"])
-        predicted = _operator_observation(model, state)
+        state, degraded = replay_traced(
+            model, [*prefix, action], self.payload["seed"], self.payload.get("chance")
+        )
+        state, predicted = settle(model, state)
         recorded = self.payload["expected"]
         failures = [
             f"{metric}: {float(getattr(predicted, metric)):.4g} vs {value:.4g}"
@@ -258,9 +356,16 @@ class ModelTest:
     def _run_legality(self, model: CodeWorldModel) -> TestResult:
         prefix = [ActionKey(a) for a in self.payload["prefix"]]
         action = ActionKey(self.payload["action"])
-        state = replay(model, prefix, self.payload["seed"])
+        state, degraded = replay_traced(
+            model, prefix, self.payload["seed"], self.payload.get("chance")
+        )
         legal = model.get_legal_actions(state)
-        if action not in legal:
+        # Compare modulo the tracking id. A utm is minted per post and is
+        # required to be non-empty, but no specific value ever makes a move
+        # legal or illegal -- so a model that offers the right move under a
+        # different utm has got the rule right, and failing it here would be
+        # scoring bookkeeping as understanding.
+        if _without_utm(action) not in {_without_utm(a) for a in legal}:
             return TestResult(
                 passed=False,
                 detail=(
@@ -342,6 +447,10 @@ def generate(
     tolerance = tolerance if tolerance is not None else Tolerance()
     codec = ActionCodec()
     actions = [codec.encode(step.move) for step in trajectory.steps]
+    # The whole recorded chance sequence goes into every payload. Replay
+    # consumes it in order and stops when the prefix is exhausted, so each test
+    # sees exactly the draws that occurred before its own decision point.
+    chance = list(trajectory.chance)
     tests: list[ModelTest] = []
 
     for index, step in enumerate(trajectory.steps):
@@ -366,6 +475,7 @@ def generate(
                             "metrics": metrics,
                         },
                         "seed": index,
+                        "chance": chance,
                     },
                     tolerance=tolerance,
                 )
@@ -378,6 +488,7 @@ def generate(
                         "prefix": actions[:index],
                         "action": actions[index],
                         "seed": index,
+                        "chance": chance,
                     },
                     tolerance=tolerance,
                 )
@@ -393,6 +504,7 @@ def generate(
                         "metrics": metrics,
                     },
                     "seed": index,
+                        "chance": chance,
                 },
                 tolerance=tolerance,
             )
@@ -403,7 +515,7 @@ def generate(
             ModelTest(
                 name="no_crash",
                 kind=NO_CRASH,
-                payload={"steps": 2 * len(trajectory.steps) + 10, "seed": 13},
+                payload={"steps": 2 * len(trajectory.steps) + 10, "seed": 13, "chance": chance},
                 tolerance=tolerance,
             )
         )
@@ -412,7 +524,11 @@ def generate(
                 ModelTest(
                     name="termination",
                     kind=TERMINATION,
-                    payload={"max_plies": 4 * len(trajectory.steps) + 20, "seed": 17},
+                    payload={
+                        "max_plies": 4 * len(trajectory.steps) + 20,
+                        "seed": 17,
+                        "chance": chance,
+                    },
                     tolerance=tolerance,
                 )
             )

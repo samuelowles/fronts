@@ -26,8 +26,8 @@ should not be in the business of hard-coding those beliefs.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 __all__ = ["SignalCost", "SignallingConfig", "separates", "separating_power", "ClaimCredibility"]
 

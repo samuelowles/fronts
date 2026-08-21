@@ -17,8 +17,7 @@ the tournament is not a tiebreaker, it is noise with a decimal point.
 from __future__ import annotations
 
 import random
-from collections.abc import Callable
-from typing import Sequence
+from collections.abc import Callable, Sequence
 
 from blotto.cwm.arena import Agent, play_episode
 from blotto.cwm.llm import LLMClient, extract_code

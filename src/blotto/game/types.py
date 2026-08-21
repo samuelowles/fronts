@@ -428,6 +428,28 @@ class Trajectory:
     account: str = ""
     notes: str = ""
 
+    chance: list[ActionKey] = field(default_factory=list)
+    """Every chance outcome resolved during this trajectory, in temporal order.
+
+    Without this the whole measurement apparatus is broken, so it is worth being
+    clear about why. All transitions are deterministic given the chance player's
+    action -- that is the paper's design and this repository keeps it. It
+    follows that a transition test can only be evaluated by replaying the SAME
+    chance outcome the recording drew. Re-sampling instead compares a model's
+    prediction under one draw against a recording made under another, and scores
+    the difference as model error.
+
+    That is not a small effect. When replay re-sampled, the reference model --
+    the ground truth, tested against trajectories it generated itself -- scored
+    between 0.20 and 0.50. A perfect model could not have done better. Every
+    number downstream was noise: refinement could never hit its early stop, and
+    accuracy reports sat on a scale whose maximum was unknown.
+
+    An operator recording real history cannot observe the chance draw either.
+    They record what settled instead, and the recorded observation plays the
+    same role: it pins the branch. What must never happen is drawing a fresh one
+    at evaluation time and calling the difference a prediction error."""
+
 
 # ---------------------------------------------------------------------------
 # Evidence gates.

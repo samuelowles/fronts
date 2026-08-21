@@ -57,7 +57,6 @@ from blotto.game.types import (
     Scale,
     SemanticTier,
 )
-
 from blotto.solvers.blotto import BlottoAllocator, BlottoConfig, Front
 from blotto.solvers.congestion import CongestionGame
 from blotto.solvers.exp3 import EXP3, EXP3Config
@@ -522,9 +521,8 @@ def cwm_reference_reaches_terminal() -> None:
     producing settled observations along the way."""
     import random
 
-    from blotto.game.types import TERMINAL_PLAYER
-
     from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
+    from blotto.game.types import TERMINAL_PLAYER
 
     model = ReferenceWorldModel(ReferenceConfig(horizon=6))
     state = model.initial_state()

@@ -26,7 +26,7 @@ from blotto.solvers.congestion import (
     congested_payoff,
     crowding_adjusted_ranking,
 )
-from blotto.solvers.exp3 import EXP3, EXP3Config, EXP3P, EXP3PConfig, regret_bound
+from blotto.solvers.exp3 import EXP3, EXP3P, EXP3Config, EXP3PConfig, regret_bound
 from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig, MCTSResult
 from blotto.solvers.signalling import (
     ClaimCredibility,
@@ -423,7 +423,7 @@ def test_congestion_potential_strictly_increases_along_improvements() -> None:
         if not moved:
             break
     assert len(potentials) > 1
-    for earlier, later in zip(potentials, potentials[1:]):
+    for earlier, later in zip(potentials, potentials[1:], strict=False):
         assert later > earlier
     assert game.is_nash(profile)
 

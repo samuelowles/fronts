@@ -14,14 +14,17 @@ drifted apart and must be re-recorded.
 from __future__ import annotations
 
 import random
+import types
 from dataclasses import asdict
 from pathlib import Path
 
 import pytest
 
-from blotto.cwm.arena import ArenaConfig, play_episode, run as arena_run
+from blotto.cwm.arena import ArenaConfig, play_episode
+from blotto.cwm.arena import run as arena_run
 from blotto.cwm.inference import (
     FallbackInference,
+    inference_accuracy,
     synthesise_state_inference,
     validate_history,
 )
@@ -32,9 +35,9 @@ from blotto.cwm.llm import (
     extract_code,
     prompt_key,
 )
+from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
 from blotto.cwm.refine import RefineConfig, RefinementNode, RefinementTree
 from blotto.cwm.refine import refine as refine_tree
-from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
 from blotto.cwm.report import ModelQualityReport
 from blotto.cwm.sandbox import (
     CWM_METHOD_PARAMS,
@@ -50,11 +53,11 @@ from blotto.cwm.sandbox import (
 from blotto.cwm.synth import SynthConfig, build_prompt, synthesise
 from blotto.cwm.tests_from_traj import (
     LEGALITY,
-    ModelTest,
     NO_CRASH,
     OBSERVATION_RECONSTRUCTION,
     TERMINATION,
     TRANSITION,
+    ModelTest,
     Tolerance,
     generate,
     replay,
@@ -342,33 +345,107 @@ def test_sandbox_refusal_names_the_node() -> None:
     assert "os" in str(excinfo.value)
 
 
-def test_sandbox_executes_permitted_modules() -> None:
+def test_sandbox_executes_against_bound_values_not_modules() -> None:
+    """Synthesised code gets values, never modules, and needs no imports.
+
+    The previous version of this test imported `math`, `random` and
+    `dataclasses` and asserted they worked. That was the vulnerability: an
+    allowlist of modules is not a boundary, because module objects form a
+    reachable graph and allowlisted ones re-export dangerous ones as ordinary
+    non-dunder attributes -- `random._os` is the real `os`. The names below are
+    pre-bound values, so there is nothing to traverse.
+    """
     source = (
-        "from __future__ import annotations\n"
-        "import math\n"
-        "import random\n"
-        "from dataclasses import dataclass\n"
-        "\n"
         "@dataclass\n"
         "class Box:\n"
         "    value: float\n"
         "\n"
-        "RESULT = Box(math.sqrt(16.0))\n"
-        "rng = random.Random(1)\n"
-        "DRAW = rng.random()\n"
+        "RESULT = Box(sqrt(16.0))\n"
+        "DRAW = Random(1).random()\n"
     )
     namespace = Sandbox().load(source, SandboxConfig())
     assert namespace.RESULT.value == 4.0
-    assert namespace.DRAW == random.Random(1).random()
+    assert random.Random(1).random() == namespace.DRAW
+
+
+def test_sandbox_namespace_contains_no_module_objects() -> None:
+    """The invariant that closes the entire escape class.
+
+    Every published bypass of the previous sandbox -- `random._os`,
+    `typing.sys.modules`, `dataclasses.builtins.open`, `collections._sys`,
+    `json.codecs` -- began by reaching a module object bound in the namespace.
+    If nothing in the namespace is a module, none of them have a first step,
+    and the property holds without enumerating the attacks.
+
+    This assertion is worth more than the nine regression tests below it,
+    because those cover the bypasses we know about and this covers the ones we
+    do not.
+    """
+    namespace = Sandbox().load("VALUE = sqrt(9.0)\n", SandboxConfig())
+    leaked = {
+        name: type(value).__name__
+        for name, value in vars(namespace).items()
+        if isinstance(value, types.ModuleType)
+    }
+    assert leaked == {}, f"module objects reachable from sandbox namespace: {leaked}"
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import random\nX = random._os.getcwd()\n",
+        "from random import _os\nX = _os.getpid()\n",
+        "import typing\nX = typing.sys.modules['os']\n",
+        "import dataclasses\nX = dataclasses.builtins.open('/etc/hostname').read()\n",
+        "import collections\nX = collections._sys.modules['os']\n",
+        "import json\nX = json.codecs.open('/etc/hostname').read()\n",
+        "import statistics\nX = statistics.random._os.getpid()\n",
+        "import re\nX = re.enum\n",
+        "import datetime\nX = datetime.sys.executable\n",
+    ],
+    ids=[
+        "random._os",
+        "from-random-import-_os",
+        "typing.sys.modules",
+        "dataclasses.builtins.open",
+        "collections._sys",
+        "json.codecs",
+        "statistics.random",
+        "re.enum",
+        "datetime.sys",
+    ],
+)
+def test_sandbox_refuses_known_module_graph_escapes(source: str) -> None:
+    """Every one of these executed successfully against the previous sandbox.
+
+    They are recorded here as regressions rather than as a security boundary --
+    the boundary is the no-modules invariant above. Note that none of them use
+    a forbidden attribute name, which is why a longer denylist would not have
+    helped.
+    """
+    with pytest.raises(SandboxViolation):
+        Sandbox().load(source, SandboxConfig())
+
+
+def test_sandbox_load_applies_the_timeout() -> None:
+    """A module-level infinite loop must raise, not hang.
+
+    `timeout_seconds` was previously read by nothing: `load` ran a bare `exec`,
+    so one synthesised module with a top-level loop would wedge a 500-call
+    refinement run forever.
+    """
+    with pytest.raises(SandboxTimeout):
+        Sandbox().load("while True:\n    pass\n", SandboxConfig(timeout_seconds=1.0))
 
 
 def test_sandbox_timeout_raises() -> None:
-    config = SandboxConfig(
-        allowed_modules=frozenset({"math", "time", "random"})
-    )
     namespace = Sandbox().load(
-        "import time\n\ndef slow():\n    time.sleep(5.0)\n    return 1\n",
-        config,
+        "def slow():\n"
+        "    total = 0\n"
+        "    for i in range(10 ** 12):\n"
+        "        total += i\n"
+        "    return total\n",
+        SandboxConfig(),
     )
     with pytest.raises(SandboxTimeout):
         call_with_timeout(namespace.slow, (), timeout=0.25)
@@ -489,9 +566,16 @@ def test_generate_trajectory_attaches_observations() -> None:
     trajectory = model.generate_trajectory(first_publish_policy, 6, random.Random(2))
     assert len(trajectory.steps) == 6
     assert all(isinstance(step.move, (Publish, Hold)) for step in trajectory.steps)
-    settled = [s for s in trajectory.steps if s.observation is not None]
-    assert settled, "a six-day posting policy must have settled observations"
-    assert all(not s.observation.is_partial for s in settled)
+    attached = [s for s in trajectory.steps if s.observation is not None]
+    assert attached, "a six-day posting policy must attach observations"
+    # The last post or two are still inside the 24-72h reporting window when the
+    # episode ends, so their observations are legitimately provisional. What
+    # matters is that a provisional one is LABELLED, not that none exists --
+    # test generation drops them on the flag, and an unflagged provisional
+    # number is the thing that would poison the training signal.
+    assert any(not s.observation.is_partial for s in attached)
+    settled = [s for s in attached if not s.observation.is_partial]
+    assert len(settled) >= len(attached) - 3
 
 
 # ---------------------------------------------------------------------------
@@ -532,15 +616,18 @@ def test_open_deck_adds_hidden_state_tests() -> None:
 
 def test_tolerance_separates_counts_from_rates() -> None:
     tolerance = Tolerance()
-    # 35% off a count is inside the 0.25 band only if... it is not:
+    # Defaults are counts 0.05, rates 0.02. They were 0.25 and 0.10 while
+    # replay re-sampled chance, and had to be that wide to absorb a bucket the
+    # model could not predict; with chance replayed the slack is unnecessary.
     assert not tolerance.allows("reach", 1350, 1000)
-    # 15% off a count is fine; 15% off a rate is not.
-    assert tolerance.allows("reach", 1150, 1000)
-    assert not tolerance.allows("hook_rate", 0.115, 0.100)
-    assert tolerance.allows("hook_rate", 0.105, 0.100)
+    assert not tolerance.allows("reach", 1150, 1000)
+    # 4% off a count is fine; 4% off a rate is not.
+    assert tolerance.allows("reach", 1040, 1000)
+    assert not tolerance.allows("hook_rate", 0.104, 0.100)
+    assert tolerance.allows("hook_rate", 0.1015, 0.100)
     # A zero actual must not demand an exactly-zero prediction: the floor of
     # one unit buys small noise around zero, and nothing more.
-    assert tolerance.allows("reach", 0.2, 0)
+    assert tolerance.allows("reach", 0.04, 0)
     assert not tolerance.allows("reach", 2, 0)
 
 
@@ -778,23 +865,29 @@ def test_validate_history_accepts_consistent_and_rejects_contradicted() -> None:
         rotating_publish_policy, 6, random.Random(11)
     )
     actions = [ActionCodec().encode(step.move) for step in trajectory.steps]
-    # Observations produced by a seed-0 replay are exactly what
-    # validate_history replays internally, so they must validate.
+    # Replay the RECORDED chance sequence, not a fresh seed-0 draw. Sampling
+    # here would compare the model against a branch that never happened, which
+    # is the defect that made transition tests unmeasurable.
     observations = []
     for index in range(len(actions)):
-        state = replay(model, actions[: index + 1], seed=0)
+        state = replay(model, actions[: index + 1], seed=0, chance=trajectory.chance)
         obs = model.get_observations(state)[0]
         if obs.utm_content:
             observations.append(obs)
     assert len({obs.utm_content for obs in observations}) == len(observations), (
         "each post must have its own utm for validation to be well-posed"
     )
-    assert validate_history(model, actions, observations)
+    assert validate_history(model, actions, observations, trajectory.chance)
 
     from dataclasses import replace
 
-    contradicted = [replace(observations[0], reach=observations[0].reach * 50)]
-    assert not validate_history(model, actions, contradicted)
+    # Contradict a SETTLED observation. Provisional ones are skipped by design
+    # -- a number still inside the reporting window cannot contradict anything,
+    # because it is not yet a claim about what happened. Falsifying a partial
+    # observation and expecting rejection tests the skip, not the validator.
+    settled = next(obs for obs in observations if not obs.is_partial)
+    contradicted = [replace(settled, reach=settled.reach * 50)]
+    assert not validate_history(model, actions, contradicted, trajectory.chance)
 
 
 # ---------------------------------------------------------------------------
@@ -861,8 +954,8 @@ def test_report_formats_train_test_and_online() -> None:
         total_tests=52,
     )
     table = report.format_table()
-    for split in ("train", "test", "online"):
-        assert split in table
+    for section in ("train", "test", "online"):
+        assert section in table
     assert "0.78" in table and "0.75" in table and "0.71" in table
     assert "transition" in table and "inference" in table
     assert "500" in table
@@ -871,3 +964,142 @@ def test_report_formats_train_test_and_online() -> None:
     assert report.inference_accuracy == 0.77
     assert report.llm_calls == 500
     assert (report.passed_tests, report.total_tests) == (39, 52)
+
+
+def _random_policy(model: object, state: object) -> str:
+    legal = model.get_legal_actions(state)  # type: ignore[attr-defined]
+    return random.Random(len(str(state))).choice(legal) if legal else "hold"
+
+
+@pytest.mark.parametrize("horizon", [10, 20, 30])
+@pytest.mark.parametrize("include_hidden", [False, True], ids=["closed_deck", "open_deck"])
+def test_reference_model_scores_one_against_its_own_trajectories(
+    horizon: int, include_hidden: bool
+) -> None:
+    """The measurement instrument must read zero on a known-zero input.
+
+    This is the most important test in the repository, and its absence let two
+    defects live behind confident docstrings for the whole first draft.
+
+    A model tested against trajectories IT generated should score a perfect
+    pass rate. Anything less means the harness is charging the model for
+    something other than being wrong, and every downstream number inherits the
+    error: refinement can never reach its early stop, so every run burns the
+    full call budget, and accuracy reports sit on a scale whose maximum nobody
+    knows. When this suite first ran, the reference model scored 0.20.
+
+    Two causes, both bookkeeping rather than modelling:
+
+    1. Replay re-sampled the chance player instead of replaying the recorded
+       outcome, so a prediction made under one branch was compared against a
+       recording made under another and the difference scored as model error.
+    2. `generate_trajectory` let two distinct posts share a utm, and utm is the
+       join key between a move and its observation. The later post's metrics
+       overwrote the earlier's, which read as a 3x prediction error.
+
+    Note the tolerances are the tightened ones -- counts 0.05, rates 0.02. The
+    original 0.25/0.10 existed to absorb a +/-50% chance bucket the model could
+    not predict, which is a tolerance concealing a broken measurement rather
+    than accommodating real variance.
+    """
+    config = ReferenceConfig(horizon=horizon, seed=7)
+    recorder = ReferenceWorldModel(config)
+    trajectory = recorder.generate_trajectory(_random_policy, horizon, random.Random(7))
+
+    tests = generate(trajectory, Tolerance(), include_hidden=include_hidden)
+    assert tests, "a trajectory of this length must yield tests"
+
+    subject = ReferenceWorldModel(config)
+    results = [test.run(subject) for test in tests]
+    failures = [r.detail for r in results if not r.passed]
+    assert not failures, (
+        f"ground truth failed {len(failures)}/{len(results)} of its own tests; "
+        f"the harness is measuring something other than model error: {failures[:3]}"
+    )
+
+
+def test_trajectory_records_chance_outcomes() -> None:
+    """Without the recorded chance sequence the test above cannot hold.
+
+    Transitions are deterministic given the chance action, so a recording that
+    discards it cannot be replayed -- only re-rolled.
+    """
+    config = ReferenceConfig(horizon=12, seed=3)
+    model = ReferenceWorldModel(config)
+    trajectory = model.generate_trajectory(_random_policy, 12, random.Random(3))
+    assert trajectory.chance, "chance outcomes must be recorded, not discarded"
+    assert all(isinstance(key, str) for key in trajectory.chance)
+
+
+def test_generated_trajectory_utms_are_unique() -> None:
+    """utm is the join key between a move and its observation, so a collision
+    silently merges two posts into one row."""
+    config = ReferenceConfig(horizon=30, seed=11)
+    model = ReferenceWorldModel(config)
+    trajectory = model.generate_trajectory(_random_policy, 30, random.Random(11))
+    utms = [
+        step.move.utm_content
+        for step in trajectory.steps
+        if isinstance(step.move, Publish)
+    ]
+    assert len(utms) == len(set(utms)), "duplicate utm_content across distinct posts"
+
+
+def test_inference_accuracy_scores_an_oracle_at_one() -> None:
+    """A perfect sampler must be able to score 1.0.
+
+    It could not before. Dispatch sniffed for a `resample_history` attribute,
+    so any sampler defining both methods -- `FallbackInference` among them --
+    went down the history path, where an empty sample failed validation on the
+    first comparison. The function returned 0.0 for every input it was ever
+    given, was exported, and had no test.
+    """
+    config = ReferenceConfig(horizon=15, seed=4)
+    model = ReferenceWorldModel(config)
+    trajectory = model.generate_trajectory(_random_policy, 15, random.Random(4))
+    actions = [ActionCodec().encode(step.move) for step in trajectory.steps]
+
+    class Oracle:
+        """Reconstructs the true state by replaying the recorded history."""
+
+        def resample_state(self, history: list, player_id: int) -> dict:
+            return replay(model, actions[: len(history) + 1], 0, trajectory.chance)
+
+        def resample_history(self, history: list, player_id: int) -> list:
+            return actions[: len(history) + 1]
+
+    assert inference_accuracy(model, Oracle(), [trajectory], mode="state") == 1.0
+    assert inference_accuracy(model, Oracle(), [trajectory], mode="history") == 1.0
+
+    # The fallback should score low -- but low by measurement, not by being
+    # structurally unable to score at all.
+    fallback = inference_accuracy(
+        model, FallbackInference(model=model), [trajectory], mode="state"
+    )
+    assert 0.0 <= fallback < 0.5
+
+
+def test_inference_accuracy_rejects_an_unknown_mode() -> None:
+    model = ReferenceWorldModel(ReferenceConfig(horizon=6, seed=1))
+    with pytest.raises(ValueError):
+        inference_accuracy(model, FallbackInference(model=model), [], mode="sniff")
+
+
+@pytest.mark.parametrize("horizon", [6, 10, 11, 20, 21])
+def test_validate_history_accepts_a_model_validating_itself(horizon: int) -> None:
+    """Horizon-independent, which it was not.
+
+    The replay loop broke on the action list at the top, so after the last
+    operator move the following chance ply never ran and the final publish never
+    resolved into an observation. The result was True at 6, False at 10, True at
+    20 -- which reads exactly like a horizon-dependent modelling weakness and is
+    an off-by-one. The original test used horizon 6 and passed by luck.
+    """
+    config = ReferenceConfig(horizon=horizon, seed=5)
+    model = ReferenceWorldModel(config)
+    trajectory = model.generate_trajectory(_random_policy, horizon, random.Random(5))
+    actions = [ActionCodec().encode(step.move) for step in trajectory.steps]
+    observations = [s.observation for s in trajectory.steps if s.observation is not None]
+
+    subject = ReferenceWorldModel(config)
+    assert validate_history(subject, actions, observations, trajectory.chance)

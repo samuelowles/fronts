@@ -27,7 +27,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
-from blotto.game.action_space import ActionCodec, enumerate_publishes
+from blotto.game.action_space import ActionCodec, enumerate_publishes, utm_content_id
 from blotto.game.legality import (
     ACQUISITION_CTAS,
     AllocationChange,
@@ -759,6 +759,7 @@ class ReferenceWorldModel:
         """
         state = self.initial_state()
         moves: list[Move] = []
+        chance: list[ActionKey] = []
         while self.get_current_player(state) != TERMINAL_PLAYER and len(moves) < steps:
             player = self.get_current_player(state)
             if player == CHANCE_PLAYER:
@@ -768,6 +769,10 @@ class ReferenceWorldModel:
                     weights=[prob for _, prob in outcomes],
                     k=1,
                 )[0]
+                # Recorded, not discarded. A transition is deterministic given
+                # the chance action, so a test that re-draws is measuring the
+                # dice rather than the model. See Trajectory.chance.
+                chance.append(action)
                 state = self.apply_action(state, action)
                 continue
             legal = self.get_legal_actions(state)
@@ -779,11 +784,24 @@ class ReferenceWorldModel:
                     f"policy returned illegal action {action!r}; legality is a "
                     "precondition on planning, not a penalty"
                 )
-            moves.append(self.codec.decode(action))
+            move = self.codec.decode(action)
+            if isinstance(move, Publish):
+                # Re-stamp with a per-step unique id. The legal-action set
+                # offers a fixed catalogue, so a policy that picks the same
+                # entry twice would publish two distinct posts under one utm --
+                # and utm is the join key between a move and its observation.
+                # The two posts then collapse to one row, the later metrics
+                # overwrite the earlier, and a transition test compares a
+                # model's prediction for post A against the numbers post B
+                # eventually produced. That looked like a 3x modelling error
+                # and was a bookkeeping collision.
+                move = replace(move, utm_content=utm_content_id(move, salt=str(len(moves))))
+                action = self.codec.encode(move)
+            moves.append(move)
             state = self.apply_action(state, action)
 
         by_utm = {obs.utm_content: obs for obs in state["log"]}
-        trajectory = Trajectory(account="reference")
+        trajectory = Trajectory(account="reference", chance=chance)
         for move in moves:
             obs: Observation | None = None
             if isinstance(move, Publish):
