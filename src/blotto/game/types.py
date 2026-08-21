@@ -371,8 +371,14 @@ class Observation:
     impressions: int = 0
     reach: int = 0
     hook_rate: float = 0.0
-    """Watch past 2s. Below 25% the algorithm abandons the asset
-    (DTC 13_The_Hook_Library_and_Visual_Pattern_Interrupts.md)."""
+    """Thumbstop rate. Below 25% the algorithm abandons the asset
+    (DTC 13_The_Hook_Library_and_Visual_Pattern_Interrupts.md).
+
+    Mind the definition. The DTC corpus measures it at 3 seconds ("the % of
+    impressions that watch the first 3 seconds"); the GTM corpus measures it at
+    2. The archetype bands in ``priors.py`` are the 3-second figures and are not
+    interchangeable with a 2-second number pulled from a platform dashboard.
+    Calibrate against your own definition before comparing to either."""
     hold_rate: float = 0.0
     saves: int = 0
     shares: int = 0
