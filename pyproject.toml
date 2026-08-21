@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "blotto"
+version = "0.1.0"
+description = "Plan organic distribution as an imperfect-information game, inside a world model an LLM wrote."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "owles.works" }]
+keywords = [
+    "game-theory",
+    "world-models",
+    "ismcts",
+    "distribution",
+    "growth",
+    "program-synthesis",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.26",
+    "pydantic>=2.6",
+    "typer>=0.12",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+llm = ["anthropic>=0.40", "openai>=1.40"]
+platforms = ["composio>=0.8"]
+dev = [
+    "pytest>=8.0",
+    "pytest-timeout>=2.2",
+    "hypothesis>=6.100",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+blotto = "blotto.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/owles-works/blotto"
+Source = "https://github.com/owles-works/blotto"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/blotto"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: fast pure-function tests, no subprocess and no network",
+    "integration: exercises the synthesis loop against recorded fixtures",
+    "live: requires real API credentials; deselected by default",
+]
+addopts = "-m 'not live' --timeout=60"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+disallow_untyped_defs = true
