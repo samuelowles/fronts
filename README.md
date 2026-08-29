@@ -149,8 +149,15 @@ dependencies.
 ## Install
 
 ```bash
-pip install blotto              # core: zero dependencies
-pip install "blotto[all]"       # + LLM providers, Composio, CLI
+git clone https://github.com/owles-works/blotto && cd blotto
+pip install -e .                       # core: zero dependencies
+python examples/walkthrough.py         # the whole loop, ~6s, no keys needed
+```
+
+Add providers only when you want a real synthesis run:
+
+```bash
+pip install -e ".[all]"                # + Anthropic / OpenAI / Composio
 ```
 
 The game, world-model and solver layers depend on nothing outside the standard
@@ -159,6 +166,57 @@ drop into a Lambda, and a repository that needs a wheel built before it will
 tell you anything is a repository nobody evaluates.
 
 ---
+
+## See it run
+
+No keys, no network, no setup. `examples/walkthrough.py` drives the whole loop
+against a reference model in about six seconds. Three excerpts, verbatim.
+
+**The instrument reads zero on a known-zero input.** Tests generated from a
+model's own history, run back against it:
+
+```
+3. The ground-truth test: pass rate must be exactly 1.00
+==============================================================================
+  tests generated from history: 240
+  passed against the model that wrote it: 240
+  pass rate: 1.00
+
+  1.00, exactly. Tolerances are the tightened ones (counts 0.05,
+  rates 0.02) -- wide tolerances here would only ever conceal a broken
+  instrument. A synthesised model is now measured against this scale,
+  whose maximum is finally KNOWN to be 1.00.
+```
+
+**Search, not prompting.** The concentration of visits *is* the confidence:
+
+```
+  action                                                         visits         value
+  publish|tiktok|carousel|founder_trauma|aspiration_status|triba    125     1,749,213
+  publish|tiktok|carousel|anti_hero_rant|aspiration_status|triba      2       650,303
+  hold                                                                1       246,219
+```
+
+**A refusal you can audit.** Not a warning, not a penalty — the move is absent
+from the legal set:
+
+```
+  ATTEMPT: scale 'launch_theater' by 1.10x on 12 settled conversions
+  ----------------------------------------------------------------------------
+  REFUSED
+    rule:   CREATIVE_JUDGEMENT
+    reason: angle 'launch_theater' has 12 settled conversions in the trailing 7d;
+            declaring a winner requires 50
+    source: Storytelling Engineer/17_A_B_Testing_Story_Arcs...md
+  ----------------------------------------------------------------------------
+
+  And peeking does not help: 100 conversions inside the reporting
+  lag plus 12 settled counts as 12 -- partials are dropped
+  entirely, not prorated.
+```
+
+Every refusal carries the rule, the reason, and the file the threshold came
+from. The CLI exits `2` on one, so a pipeline can tell "refused" from "broke".
 
 ## Quickstart
 
