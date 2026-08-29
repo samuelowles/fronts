@@ -1,0 +1,131 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (py${{ matrix.python }} · ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # The core has no runtime dependencies. Installing the package with no
+      # extras is itself a test: if anything under src/ has grown a third-party
+      # import, this step is where it surfaces.
+      - name: Install (no extras)
+        run: python -m pip install --disable-pip-version-check -e .
+
+      - name: Import every module with nothing else installed
+        run: |
+          python - <<'PY'
+          import importlib, pkgutil, blotto
+          for module in pkgutil.walk_packages(blotto.__path__, "blotto."):
+              importlib.import_module(module.name)
+          print("all modules import with zero dependencies")
+          PY
+
+      # Runs without pytest, so it still tells the truth in an environment
+      # where nothing is installed. This is the last line of defence.
+      - name: Self-check
+        run: python scripts/selfcheck.py
+
+      - name: Install dev extras
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Tests
+        run: python -m pytest tests/ -q
+
+      # No API keys, no network. If the walkthrough needs either, that is a bug.
+      - name: End-to-end walkthrough
+        run: python examples/walkthrough.py
+
+  lint:
+    name: lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Ruff
+        run: ruff check .
+      - name: Mypy
+        run: mypy src/blotto
+
+  invariants:
+    name: architectural invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Solvers are general algorithms. They may see the type definitions and
+      # nothing else. Importing priors or legality into a solver would bind a
+      # published algorithm to one vertical's marketing constants, so the rule
+      # is enforced here rather than trusted to review.
+      - name: Solvers do not import game internals
+        run: |
+          if grep -rnE "from blotto\.game\.(priors|legality|payoff|action_space)" src/blotto/solvers/; then
+            echo "::error::a solver imported a game internal; see AGENTS.md"
+            exit 1
+          fi
+          echo "solver decoupling holds"
+
+      # The whole point of the core being dependency-free.
+      - name: No third-party imports in src/
+        run: |
+          if grep -rnE "^\s*(import|from)\s+(numpy|pandas|scipy|pydantic|typer|rich|requests|httpx)\b" src/; then
+            echo "::error::third-party import in src/; the core is stdlib-only"
+            exit 1
+          fi
+          echo "core is stdlib-only"
+
+      # Provider SDKs must be imported lazily inside functions so that every
+      # module imports in an environment with none of them installed.
+      - name: Provider SDKs are not imported at module level
+        run: |
+          if grep -rnE "^\s*(import|from)\s+(anthropic|openai|composio)\b" src/; then
+            echo "::error::provider SDK imported at module level; import it inside the function"
+            exit 1
+          fi
+          echo "provider SDKs are lazy"
+
+      # An empirical claim without a citation is not permitted to exist.
+      # selfcheck asserts this per entry; this catches the file being bypassed.
+      - name: Every prior carries a source
+        run: |
+          PYTHONPATH=src python - <<'PY'
+          from blotto.game import priors
+          missing = []
+          for name in dir(priors):
+              table = getattr(priors, name)
+              if not isinstance(table, dict):
+                  continue
+              for key, entry in table.items():
+                  if entry is None:
+                      continue
+                  if not getattr(entry, "source", ""):
+                      missing.append(f"{name}[{key}]")
+          if missing:
+              raise SystemExit(f"priors without a source: {missing}")
+          print("every prior carries a source")
+          PY

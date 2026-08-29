@@ -1,7 +1,17 @@
-# blotto
+<h1 align="center">blotto</h1>
 
-**Plan content distribution as an imperfect-information game — inside a world
-model a language model wrote for you.**
+<p align="center">
+  <strong>Plan content distribution as an imperfect-information game —<br>
+  inside a world model a language model wrote for you.</strong>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-blue.svg"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-blue.svg">
+  <img alt="Zero runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg">
+  <a href="docs/GAME.md"><img alt="Formal game spec" src="https://img.shields.io/badge/docs-formal%20game%20spec-8957e5.svg"></a>
+  <a href="https://arxiv.org/abs/2510.04542"><img alt="arXiv 2510.04542" src="https://img.shields.io/badge/arXiv-2510.04542-b31b1b.svg"></a>
+</p>
 
 Most AI distribution tooling asks a model to *be* a marketer: here is my
 product, write me ten hooks. `blotto` asks it to do something narrower and far
@@ -114,18 +124,27 @@ programmatically rather than by inspection.
 
 ## Status
 
-The game, world-model and solver layers are built and tested — 165 tests, no
-runtime dependencies, `ruff` clean. **The Composio adapter and the CLI are not
-built yet**, so the commands below describe the intended surface rather than
-something you can run today; `examples/` and `blotto plan` are the next
-milestone. Everything under `src/blotto/` works and is exercised by the suite.
+> [!WARNING]
+> **`blotto` executes Python that a language model wrote.** The sandbox was
+> independently reviewed and found *fully escapable* in its first form — an
+> allowlist of modules cannot hold, because module objects form a reachable
+> graph and `random._os` is the real `os`. It now refuses imports outright and
+> binds values instead, with the nine verified escapes kept as regression
+> tests. Anything running genuinely untrusted synthesis output should still use
+> `SubprocessSandbox` or a container. [`SECURITY.md`](SECURITY.md) has the full
+> account, including the escapes.
 
-The sandbox that executes synthesised code was independently reviewed and found
-fully escapable in its first form — an allowlist of *modules* cannot hold,
-because module objects form a reachable graph and `random._os` is the real `os`.
-It now refuses imports outright and binds values instead, with the nine verified
-escapes kept as regression tests. Anything running genuinely untrusted synthesis
-output should still use `SubprocessSandbox` or a container.
+> [!IMPORTANT]
+> **You need roughly 30 published items with settled metrics before synthesis
+> is worth attempting.** Below that floor you will get a model that fits your
+> history and predicts nothing, and `blotto accuracy` will show it as a wide
+> train/test gap. Run the model-free solvers — Blotto allocation and EXP3 angle
+> selection — until you have history worth learning from.
+> [`docs/OPERATING.md`](docs/OPERATING.md) covers the cold start.
+
+Alpha. The API will move. Everything under `src/blotto/` is exercised by the
+test suite, `ruff` and `mypy` are clean, and the core has zero runtime
+dependencies.
 
 ## Install
 
