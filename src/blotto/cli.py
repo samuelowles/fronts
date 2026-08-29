@@ -30,7 +30,7 @@ import os
 import random
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -60,7 +60,7 @@ from blotto.cwm.tests_from_traj import (
     generate,
     split,
 )
-from blotto.game.action_space import ActionCodec, ActionDecodeError
+from blotto.game.action_space import ActionCodec, ActionDecodeError, utm_content_id
 from blotto.game.legality import LegalityContext, LegalityEngine
 from blotto.game.types import (
     CHANCE_PLAYER,
@@ -254,7 +254,21 @@ def _play_trajectory(
         if not legal:
             break
         action = rng.choice(legal)
-        moves.append(_CODEC.decode(action))
+        move = _CODEC.decode(action)
+        if isinstance(move, Publish):
+            # Re-stamp with a per-step unique id, exactly as
+            # ``ReferenceWorldModel.generate_trajectory`` does: the legal set
+            # is a fixed catalogue, so a random re-pick publishes two distinct
+            # posts under one utm -- and utm is the join key between a move
+            # and its observation. Without this the online split of
+            # ``accuracy`` scored the REFERENCE model below 1.0, charging it
+            # for a bookkeeping collision (see the re-stamp in
+            # ``generate_trajectory`` for the full failure mode).
+            move = replace(
+                move, utm_content=utm_content_id(move, salt=str(len(moves)))
+            )
+            action = _CODEC.encode(move)
+        moves.append(move)
         state = model.apply_action(state, action)
     for move in moves:
         observation = None

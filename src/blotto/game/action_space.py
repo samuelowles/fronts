@@ -83,7 +83,14 @@ def _check_free_text(field: str, value: str) -> None:
 
 def _parse_kv(token: str, expected: Sequence[str]) -> dict[str, str]:
     parts = token.split("=", 1)
-    if len(parts) != 2 or not parts[0] or not parts[1]:
+    # The KEY must be present and known; the VALUE may be empty. ``encode``
+    # emits ``utm=`` for a Publish with an empty ``utm_content`` (only pipes
+    # are forbidden in free text), so a decoder that rejected empty values
+    # would refuse to read back what the codec itself writes -- and would
+    # bury the ``TRACKED_OUTPUT`` refusal (the cited system invariant that
+    # exists precisely for the untracked publish) behind a generic decode
+    # error instead of the rule, reason and source an operator is owed.
+    if len(parts) != 2 or not parts[0]:
         raise ActionDecodeError(f"malformed key=value token: {token!r}")
     key, value = parts
     if key not in expected:
