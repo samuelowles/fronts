@@ -31,13 +31,12 @@ classifiers = [
 # a planner with a numpy dependency is a planner people cannot drop into a
 # Lambda, and a repository that needs a wheel built before it will tell you
 # anything is a repository nobody evaluates. Extras buy you provider clients
-# and a prettier CLI, and nothing else.
+# and platform I/O, and nothing else -- the CLI is argparse on purpose.
 dependencies = []
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.40", "openai>=1.40"]
 platforms = ["composio>=0.8"]
-cli = ["typer>=0.12", "rich>=13.7"]
 dev = [
     "pytest>=8.0",
     "pytest-timeout>=2.2",
@@ -45,7 +44,7 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
 ]
-all = ["blotto[llm,platforms,cli]"]
+all = ["blotto[llm,platforms]"]
 
 [project.scripts]
 blotto = "blotto.cli:app"
@@ -56,6 +55,12 @@ Source = "https://github.com/owles-works/blotto"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/blotto"]
+
+# Ship the example config in the wheel too, next to the package: a config
+# format nobody can find an example of is a format nobody configures, and
+# `blotto.example.toml` is the documented starting point for [measurement].
+[tool.hatch.build.targets.wheel.force-include]
+"blotto.example.toml" = "blotto.example.toml"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,78 @@
+# blotto configuration. Copy to blotto.toml and edit.
+# Every section is optional; anything absent keeps its default.
+# `blotto --config PATH ...` selects a non-default file.
+
+[paths]
+# Where the loop's artefacts live. Relative paths resolve against the
+# directory you run `blotto` from.
+history  = "data/trajectories.jsonl"   # recorded moves + observations
+rules    = "rules.md"                  # platform policy, in prose
+model    = "data/model.py"             # the synthesised world model
+plan     = "data/plan.json"            # written by `plan`, read by `publish`
+briefs   = "data/briefs.json"          # written by `brief`
+
+[economics]
+# YOUR unit economics, per paying user per month. The reward the planner
+# maximises is contribution margin computed from these -- see
+# src/blotto/game/payoff.py for what each field does to it.
+arpu_monthly      = 100.0    # revenue per paying user per month
+gross_margin      = 0.8      # after cost of service
+monthly_churn     = 0.08     # fraction of paying users lost per month
+cogs_share        = 0.2      # cost of goods as a share of revenue
+fixed_cost_per_post = 50.0   # what one published item costs you to produce
+# allowable_cac_share = 0.30 # ceiling on CAC as a share of LTV (corpus default)
+
+[policy]
+# Legality thresholds. The defaults are corpus figures with citations in
+# src/blotto/game/legality.py; change them when your risk tolerance differs,
+# not to make a refused move pass.
+creative_judgement_min_conversions = 50   # settled conversions / 7d to call a winner
+spend_commitment_min_conversions   = 300  # settled conversions / variant over 14d
+spend_commitment_min_days          = 14
+spend_commitment_factor            = 1.20 # Scale factor that counts as budget
+attribution_coverage_floor         = 0.5  # below this an angle is unjudgeable
+max_allocation_increase_48h        = 0.20 # velocity cap per rolling 48h
+acquisition_ratio_target           = 0.70 # day's acquisition/service split
+acquisition_ratio_tolerance        = 0.10
+comparative_allowed                = false
+drawdown_spend_limit               = 1000.0
+standing_floor                     = 0.5
+
+[policy.max_per_day_by_format]
+# Per-format daily caps. Production capacity, not aspiration.
+carousel    = 10
+text_thread = 5
+
+[composio]
+# Platform I/O via Composio (https://composio.dev). The api key is read
+# from COMPOSIO_API_KEY when api_key is unset -- prefer the environment;
+# keys in files get committed.
+# api_key         = "cs_..."
+user_id          = "user-123"
+timeout_seconds  = 30.0
+max_retries      = 3
+dry_run          = false
+# Action slugs are UNVERIFIED against a live account (see
+# ToolkitRegistry). When a real slug differs, override it here -- no code
+# change needed. Keys are "publish:<platform>" / "analytics:<platform>".
+# slug_overrides = { "publish:x" = "X_CREATE_POST" }
+
+[publish]
+# Landing page publishes stamp their utm_content into. Must exist before
+# `blotto publish --live` will ship anything.
+destination_url = "https://example.com/pricing"
+
+[measurement]
+# THE TWO NUMBERS NOTHING ELSE CAN SUPPLY. Leave commented out until you
+# have measured them -- docs/OPERATING.md, "The thing that will bite you".
+# Until they are set, ingest refuses to build observations rather than
+# guessing, and the legality engine keeps every angle unjudgeable.
+#
+# attribution_coverage = 0.72  # fraction of true conversions your tracking sees
+# incrementality       = 0.70  # fraction of attributed conversions YOU caused
+#
+# How to measure: attribution_coverage from a post-purchase "how did you
+# hear about us" survey reconciled against analytics for a month;
+# incrementality from a holdout (pause a channel, watch what does not drop).
+# The GTM corpus records the usual finding: the dashboard says direct, and
+# 40% of respondents name a channel it cannot see.

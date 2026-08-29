@@ -93,39 +93,69 @@ jobs:
       # The whole point of the core being dependency-free.
       - name: No third-party imports in src/
         run: |
-          if grep -rnE "^\s*(import|from)\s+(numpy|pandas|scipy|pydantic|typer|rich|requests|httpx)\b" src/; then
+          if grep -rnE "^(import|from)\s+(numpy|pandas|scipy|pydantic|typer|rich|requests|httpx)\b" src/ --include='*.py'; then
             echo "::error::third-party import in src/; the core is stdlib-only"
             exit 1
           fi
           echo "core is stdlib-only"
 
-      # Provider SDKs must be imported lazily inside functions so that every
-      # module imports in an environment with none of them installed.
+      # Provider SDKs must be imported lazily INSIDE functions so every module
+      # imports in an environment with none of them installed. The anchor is
+      # deliberately column zero and not "^\s*" -- an indented occurrence is the
+      # correct pattern, and a check that flags it would fail on working code
+      # and teach the next contributor to delete the guard rather than the bug.
       - name: Provider SDKs are not imported at module level
         run: |
-          if grep -rnE "^\s*(import|from)\s+(anthropic|openai|composio)\b" src/; then
+          if grep -rnE "^(import|from)\s+(anthropic|openai|composio|tomli)\b" src/ --include='*.py'; then
             echo "::error::provider SDK imported at module level; import it inside the function"
             exit 1
           fi
           echo "provider SDKs are lazy"
 
+      # Every module must import with nothing installed. This is the property
+      # the two greps above are proxies for, tested directly.
+      - name: Import the whole package with zero dependencies
+        run: |
+          PYTHONPATH=src python - <<'PY'
+          import importlib, pkgutil, blotto
+          for module in pkgutil.walk_packages(blotto.__path__, "blotto."):
+              importlib.import_module(module.name)
+          print("every module imports with nothing installed")
+          PY
+
       # An empirical claim without a citation is not permitted to exist.
-      # selfcheck asserts this per entry; this catches the file being bypassed.
+      # selfcheck asserts this per entry; this catches the file being bypassed,
+      # and fails loudly if a new prior table is added without being listed.
       - name: Every prior carries a source
         run: |
           PYTHONPATH=src python - <<'PY'
           from blotto.game import priors
-          missing = []
-          for name in dir(priors):
-              table = getattr(priors, name)
-              if not isinstance(table, dict):
-                  continue
-              for key, entry in table.items():
-                  if entry is None:
-                      continue
-                  if not getattr(entry, "source", ""):
-                      missing.append(f"{name}[{key}]")
+
+          TABLES = (
+              "ARCHETYPE_PRIORS",
+              "SEMANTIC_TIER_PRIORS",
+              "VECTOR_PRIORS",
+              "PLATFORM_PRIORS",
+          )
+
+          declared = {
+              name
+              for name, value in vars(priors).items()
+              if name.isupper() and isinstance(value, dict)
+          }
+          unlisted = declared - set(TABLES)
+          if unlisted:
+              raise SystemExit(
+                  f"new prior table(s) not covered by this check: {sorted(unlisted)}"
+              )
+
+          missing = [
+              f"{table}[{key}]"
+              for table in TABLES
+              for key, entry in getattr(priors, table).items()
+              if entry is not None and not getattr(entry, "source", "")
+          ]
           if missing:
               raise SystemExit(f"priors without a source: {missing}")
-          print("every prior carries a source")
+          print(f"every prior across {len(TABLES)} tables carries a source")
           PY
