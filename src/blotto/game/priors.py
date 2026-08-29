@@ -19,6 +19,38 @@ Two conventions make the source rule enforceable:
 
 Nothing in this module computes anything. It is a table, checked at import
 time by ``scripts/selfcheck.py`` and at test time by ``tests/test_game.py``.
+
+WHERE THESE NUMBERS COME FROM, AND WHAT THAT MEANS FOR YOU
+----------------------------------------------------------
+The cited files are two private operator corpora. You cannot open them, and
+that matters more than it might look, so it is worth being exact about what the
+citations do and do not buy.
+
+What they buy: provenance. Every figure here was measured somewhere specific
+rather than invented to make a formula work, and the ``source`` string says
+where, so a number can be traced, questioned, and superseded. Three of the five
+entries in ``VECTOR_PRIORS`` are ``None`` for exactly this reason -- the corpus
+does not measure them, so nothing is entered.
+
+What they do NOT buy: independent verification. You cannot check these against
+the source, and you should not treat an unverifiable citation as evidence. Nor
+are they universal constants. They are one operator's measurements, in their
+verticals, at a point in time. A 40-48% hook rate for the anti-hero archetype
+was measured when few people were running it -- and ``solvers/congestion.py``
+exists precisely because that number is a statement about an uncrowded angle,
+not a property of the archetype.
+
+So treat this table as a STARTING PRIOR, not ground truth. It exists so a cold
+system has somewhere to begin rather than a pile of zeroes. The moment you have
+your own settled history, your own measurements should replace these, and
+``docs/OPERATING.md`` describes that loop. The architecture is indifferent to
+the specific values: what it depends on is that every value can be traced to
+something, which is why the rule is enforced by a check rather than a
+convention.
+
+If you are reading this to evaluate the project rather than to use it: the
+honest summary is that the *mechanism* is verifiable from this repository and
+the *priors* are not. Judge them separately.
 """
 
 from __future__ import annotations

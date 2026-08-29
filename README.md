@@ -77,10 +77,17 @@ conclude an angle is winning and you may not conclude it is losing. This is the
 least intuitive rule in the system and the one operators most reliably get wrong
 in the confident direction.
 
-**Every number carries a citation.** `game/priors.py` holds the empirical bands,
-and each one has a `source` field naming the file it came from. A prior without
-a source is not permitted to exist, and the self-check enforces that
-programmatically rather than by inspection.
+**Every number carries a citation — and the citations are unverifiable, which
+you should know.** `game/priors.py` holds the empirical bands, each with a
+`source` field naming the file it came from, and a prior without one cannot
+exist — the self-check enforces that programmatically. But those files are two
+private operator corpora. You cannot open them. So the citations buy provenance,
+not independent verification, and these are one operator's measurements in their
+verticals at a point in time, not constants.
+
+Treat them as a **starting prior** and replace them with your own once you have
+settled history. The mechanism in this repository is verifiable from the
+repository; the priors are not. Judge them separately.
 
 ---
 
