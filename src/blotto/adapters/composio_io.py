@@ -140,22 +140,25 @@ def stamp_utm(url: str, utm_content: str) -> str:
 
 def _require_measurements(
     attribution_coverage: float | None, incrementality: float | None
-) -> None:
-    """Refuse to build an Observation without both operator measurements.
+) -> tuple[float, float]:
+    """Refuse to build an Observation without both operator measurements,
+    returning the two values now known not to be ``None``.
 
     This check runs BEFORE any network call, so a misconfigured operator
     learns it at ingest time rather than after a round of API calls whose
-    results could not be used anyway.
+    results could not be used anyway. Returning the pair (rather than
+    ``None``) is what lets callers treat the check as the proof of
+    non-``None``-ness instead of re-asserting it.
     """
-    missing = [
-        name
-        for name, value in (
-            ("attribution_coverage", attribution_coverage),
-            ("incrementality", incrementality),
-        )
-        if value is None
-    ]
-    if missing:
+    if attribution_coverage is None or incrementality is None:
+        missing = [
+            name
+            for name, value in (
+                ("attribution_coverage", attribution_coverage),
+                ("incrementality", incrementality),
+            )
+            if value is None
+        ]
         raise MissingMeasurementError(
             f"cannot build an Observation: {', '.join(missing)} is unset. "
             "Neither is measurable from a platform API -- coverage is a "
@@ -166,6 +169,7 @@ def _require_measurements(
             "that will bite you'. A plausible default here would silently "
             "corrupt every reward downstream, which is why there is none."
         )
+    return attribution_coverage, incrementality
 
 
 def _parse_timestamp(raw: str | datetime) -> datetime:
@@ -219,9 +223,7 @@ class ComposioConfig:
     user_id: str = ""
     """Composio's connected-account identifier (``user_id`` on execute)."""
 
-    timeout_seconds: float = 30.0
     max_retries: int = 3
-    dry_run: bool = False
     slug_overrides: dict[str, str] = field(default_factory=dict)
 
 
@@ -371,7 +373,7 @@ def observation_from_metrics(
     ``now`` against the measured reporting lag's high end; see
     ``_REPORTING_LAG``.
     """
-    _require_measurements(attribution_coverage, incrementality)
+    coverage, caused = _require_measurements(attribution_coverage, incrementality)
     posted = _parse_timestamp(str(metrics.get("posted_at", now.isoformat())))
     observed = _parse_timestamp(str(metrics.get("observed_at", now.isoformat())))
     return Observation(
@@ -388,8 +390,8 @@ def observation_from_metrics(
         profile_visits=int(metrics.get("profile_visits", 0)),
         link_clicks=int(metrics.get("link_clicks", 0)),
         attributed_conversions=int(metrics.get("attributed_conversions", 0)),
-        attribution_coverage=attribution_coverage,
-        incrementality=incrementality,
+        attribution_coverage=coverage,
+        incrementality=caused,
         is_partial=(now - posted) < _REPORTING_LAG,
         dark_social_estimate=float(metrics.get("dark_social_estimate", 0.0)),
     )

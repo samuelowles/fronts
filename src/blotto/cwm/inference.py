@@ -42,7 +42,7 @@ from blotto.cwm.sandbox import (
     check_protocol_methods,
 )
 from blotto.cwm.synth import SynthConfig
-from blotto.cwm.tests_from_traj import Tolerance
+from blotto.cwm.tests_from_traj import Tolerance, _draw_recorded_chance
 from blotto.game.types import (
     CHANCE_PLAYER,
     OPERATOR,
@@ -71,9 +71,14 @@ HISTORY_INFERENCE_CLASS = "HistoryInferenceSampler"
 _STATE_METHODS = {"resample_state": 2}
 _HISTORY_METHODS = {"resample_history": 2}
 
-# Validation compares model-reproduced observations to recorded ones at the
-# same standard the unit tests use; stricter than this rejects honest
-# approximations, looser admits samples that contradict the data.
+# Validation runs LOOSER than the generated tests' Tolerance defaults
+# (counts 0.05 / rates 0.02), and the gap is deliberate. A unit test replays
+# a recorded branch, so a prediction outside test precision is model error;
+# validation replays an INFERRED sample whose claim is support membership,
+# not density (module docstring), and demanding test-grade precision from a
+# sampler that is approximate by construction would reject every honest
+# sample. Stricter than THIS rejects honest approximations; looser admits
+# samples that contradict the data.
 _VALIDATION_TOLERANCE = Tolerance(counts=0.25, rates=0.10)
 
 
@@ -169,7 +174,7 @@ def _load_inference_class(
         cls = getattr(namespace, class_name, None)
         if cls is None:
             return None
-        instance = cls()
+        instance: object = cls()
         if check_protocol_methods(instance, methods, class_name):
             return None
         return instance
@@ -201,9 +206,9 @@ def synthesise_state_inference(
     instance = _load_inference_class(
         client, config, system, user, STATE_INFERENCE_CLASS, _STATE_METHODS
     )
-    if instance is None:
+    if instance is None or not isinstance(instance, StateInference):
         return FallbackInference(model=fallback_model)
-    return instance  # type: ignore[return-value]
+    return instance
 
 
 def synthesise_history_inference(
@@ -226,9 +231,9 @@ def synthesise_history_inference(
     instance = _load_inference_class(
         client, config, system, user, HISTORY_INFERENCE_CLASS, _HISTORY_METHODS
     )
-    if instance is None:
+    if instance is None or not isinstance(instance, HistoryInference):
         return FallbackInference(model=fallback_model)
-    return instance  # type: ignore[return-value]
+    return instance
 
 
 def validate_history(
@@ -273,23 +278,17 @@ def validate_history(
             outcomes = model.chance_outcomes(cursor)
             if not outcomes:
                 break
-            keys = [key for key, _ in outcomes]
             # Replay the recorded draw where we have one. Re-rolling here
             # compares the model against a branch that never happened, which is
-            # the same defect that made transition tests unmeasurable.
-            drawn: ActionKey | None = None
-            while pending and drawn is None:
-                candidate = pending.pop(0)
-                if candidate in keys:
-                    drawn = candidate
-            action = drawn if drawn is not None else rng.choices(
-                keys, weights=[prob for _, prob in outcomes], k=1
-            )[0]
+            # the same defect that made transition tests unmeasurable. The
+            # draw rule itself is shared with ``replay_traced`` so the two
+            # replay paths cannot drift apart.
+            action, _recorded = _draw_recorded_chance(outcomes, pending, rng)
         else:
             action = sampled_history[index]
             index += 1
         cursor = model.apply_action(cursor, action)
-        obs = model.get_observations(cursor).get(0)
+        obs = model.get_observations(cursor).get(OPERATOR)
         if obs is not None and obs.utm_content:
             seen[obs.utm_content] = obs
     for recorded in observations:

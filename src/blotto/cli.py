@@ -75,6 +75,7 @@ from blotto.game.types import (
     Step,
     Trajectory,
 )
+from blotto.protocols import CodeWorldModel
 from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig
 
 __all__ = ["app"]
@@ -199,7 +200,7 @@ def _rng(args: argparse.Namespace) -> random.Random:
     return random.Random(_seed_from_args(args))
 
 
-def _load_model_source(path: Path) -> Any:
+def _load_model_source(path: Path) -> CodeWorldModel:
     """Sandbox-load a world model from source text.
 
     The sandbox refuses imports and dunder access by design (see its module
@@ -212,7 +213,7 @@ def _load_model_source(path: Path) -> Any:
     return instantiate(namespace, WORLD_MODEL_CLASS)
 
 
-def _sample_chance(model: Any, state: State, rng: random.Random) -> ActionKey:
+def _sample_chance(model: CodeWorldModel, state: State, rng: random.Random) -> ActionKey:
     outcomes = model.chance_outcomes(state)
     return rng.choices(
         [key for key, _ in outcomes],
@@ -222,7 +223,7 @@ def _sample_chance(model: Any, state: State, rng: random.Random) -> ActionKey:
 
 
 def _play_trajectory(
-    model: Any,
+    model: CodeWorldModel,
     steps: int,
     rng: random.Random,
 ) -> Trajectory:
@@ -402,14 +403,24 @@ def _brief_for(move: Publish, destination_url: str | None) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _client_from_env() -> Any:
+def _client_from_env(config: SynthConfig) -> AnthropicClient | OpenAIClient:
     """Build the LLM client from whichever provider key the environment
-    holds. The order is arbitrary and stated: Anthropic first, because the
-    synthesis prompts were written against it."""
+    holds, applying the synthesis config's sampling knobs.
+
+    The order is arbitrary and stated: Anthropic first, because the
+    synthesis prompts were written against it -- which is also why
+    ``model_name`` is applied only on the Anthropic path; it names a Claude
+    model and handing it to a different provider would be a configuration
+    error wearing a sensible-looking default. ``temperature`` applies to
+    both: it is the synthesis loop's exploration knob, not a provider
+    setting.
+    """
     if os.environ.get("ANTHROPIC_API_KEY"):
-        return AnthropicClient()
+        return AnthropicClient(
+            model=config.model_name, temperature=config.temperature
+        )
     if os.environ.get("OPENAI_API_KEY"):
-        return OpenAIClient()
+        return OpenAIClient(temperature=config.temperature)
     raise RuntimeError(
         "synthesis needs a language model: export ANTHROPIC_API_KEY or "
         "OPENAI_API_KEY (pip install \"blotto[llm]\" for the SDKs)"
@@ -436,11 +447,12 @@ def _cmd_synth(args: argparse.Namespace) -> int:
     # (PAPER.md s3). Passing include_hidden=True here would emit transition
     # tests the recorded history cannot actually anchor.
     tests = generate(trajectory, Tolerance(), include_hidden=False)
-    client = _client_from_env()
+    synth_config = SynthConfig(max_calls=args.max_calls)
+    client = _client_from_env(synth_config)
 
     initial = synthesise(
         client,
-        SynthConfig(max_calls=args.max_calls),
+        synth_config,
         rules_text,
         [trajectory],
         tests[: SynthConfig().num_tests_on_init],
@@ -604,22 +616,22 @@ def _cmd_arena(args: argparse.Namespace) -> int:
     # below says so, because a rejection between strategies is not a
     # rejection between models and reading it as one would be the exact
     # confident-direction error the arena exists to prevent.
-    hosts: list[Any] = [ReferenceWorldModel(ReferenceConfig())]
+    hosts: list[CodeWorldModel] = [ReferenceWorldModel(ReferenceConfig())]
     if config.paths.model.exists():
         hosts.append(_load_model_source(config.paths.model))
 
-    def random_agent(model: Any, state: State) -> ActionKey:
+    def random_agent(model: CodeWorldModel, state: State) -> ActionKey:
         return rng.choice(model.get_legal_actions(state))
 
-    def first_publish_agent(model: Any, state: State) -> ActionKey:
+    def first_publish_agent(model: CodeWorldModel, state: State) -> ActionKey:
         legal = model.get_legal_actions(state)
         return next((key for key in legal if str(key).startswith("publish")), legal[0])
 
-    def hold_agent(model: Any, state: State) -> ActionKey:
+    def hold_agent(model: CodeWorldModel, state: State) -> ActionKey:
         legal = model.get_legal_actions(state)
         return next((key for key in legal if str(key) == "hold"), legal[0])
 
-    agents: list[tuple[str, Callable[[Any, State], ActionKey]]] = [
+    agents: list[tuple[str, Callable[[CodeWorldModel, State], ActionKey]]] = [
         ("random", random_agent),
         ("first-publish", first_publish_agent),
         ("hold", hold_agent),
@@ -668,6 +680,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         # irreversible. With no credential the dry adapter records the
         # intended reads and observes nothing.
         has_key = bool(config.composio.api_key or os.environ.get("COMPOSIO_API_KEY"))
+        adapter: ComposioAdapter | DryRunAdapter
         if has_key:
             adapter = ComposioAdapter(
                 config.composio,
@@ -748,7 +761,7 @@ def _cmd_publish(args: argparse.Namespace) -> int:
         return EXIT_ERROR
 
     if args.live:
-        adapter: Any = ComposioAdapter(
+        adapter: ComposioAdapter | DryRunAdapter = ComposioAdapter(
             config.composio,
             attribution_coverage=config.attribution_coverage,
             incrementality=config.incrementality,

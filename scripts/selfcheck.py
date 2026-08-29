@@ -34,6 +34,7 @@ from blotto.game.legality import (
 from blotto.game.payoff import (
     Economics,
     PayoffHealth,
+    allowable_cac,
     cac_payback_months,
     health,
     ltv,
@@ -358,6 +359,27 @@ def worked_economics_example() -> None:
     assert health(3.0) is PayoffHealth.GOLDEN
     assert abs(cac_payback_months(65.0, economics) - 0.8125) < 1e-9
     assert Economics.__dataclass_fields__["allowable_cac_share"].default == 0.30
+    assert abs(allowable_cac(economics) - 300.0) < 1e-9, (
+        "allowable CAC is the corpus 0.30 share of the worked example's LTV 1000"
+    )
+
+
+@check
+def economics_margin_and_cogs_cannot_contradict() -> None:
+    """Cost of service includes cost of goods, so margin + cogs_share may
+    not exceed 1.0; a config claiming otherwise is refused at construction
+    rather than silently rebasing every reward on a contradiction."""
+    Economics(arpu_monthly=100.0, gross_margin=0.8, monthly_churn=0.08,
+              cogs_share=0.2, fixed_cost_per_post=50.0)  # boundary is legal
+    try:
+        Economics(
+            arpu_monthly=100.0, gross_margin=0.9, monthly_churn=0.08,
+            cogs_share=0.2, fixed_cost_per_post=50.0,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("margin 0.9 + cogs 0.2 must be refused")
 
 
 

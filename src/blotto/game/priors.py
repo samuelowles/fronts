@@ -330,7 +330,10 @@ HOOK_RATE_ABANDON_THRESHOLD = Band(
     0.25,
     "DTC Engineer/13_The_Hook_Library_and_Visual_Pattern_Interrupts.md",
 )
-"""Below this 2-second watch-through the platform stops serving the asset."""
+"""Below this 3-second watch-through the platform stops serving the asset.
+The DTC corpus measures hook rate at 3 seconds (see
+``Observation.hook_rate`` for why that figure and a 2-second dashboard
+number are not interchangeable)."""
 
 HOLD_RATE_DECAY_TRIGGER = Band(
     0.15,

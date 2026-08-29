@@ -197,13 +197,13 @@ def _measurement(name: str, value: Any) -> float | None:
     """
     if value is None:
         return None
-    value = float(value)
-    if not 0.0 <= value <= 1.0:
+    fraction = float(value)
+    if not 0.0 <= fraction <= 1.0:
         raise ValueError(
-            f"{name} must be a fraction in [0, 1] (got {value}); if you "
+            f"{name} must be a fraction in [0, 1] (got {fraction}); if you "
             "measured 72%, that is 0.72"
         )
-    return value
+    return fraction
 
 
 def load(path: str | Path) -> BlottoConfig:
@@ -278,7 +278,7 @@ briefs   = "data/briefs.json"          # written by `brief`
 arpu_monthly      = 100.0    # revenue per paying user per month
 gross_margin      = 0.8      # after cost of service
 monthly_churn     = 0.08     # fraction of paying users lost per month
-cogs_share        = 0.2      # cost of goods as a share of revenue
+cogs_share        = 0.2      # cost of goods as a share of revenue (margin + this <= 1)
 fixed_cost_per_post = 50.0   # what one published item costs you to produce
 # allowable_cac_share = 0.30 # ceiling on CAC as a share of LTV (corpus default)
 
@@ -309,9 +309,7 @@ text_thread = 5
 # keys in files get committed.
 # api_key         = "cs_..."
 user_id          = "user-123"
-timeout_seconds  = 30.0
 max_retries      = 3
-dry_run          = false
 # Action slugs are UNVERIFIED against a live account (see
 # ToolkitRegistry). When a real slug differs, override it here -- no code
 # change needed. Keys are "publish:<platform>" / "analytics:<platform>".

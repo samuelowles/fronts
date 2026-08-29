@@ -44,9 +44,10 @@ class SynthConfig:
     budget -- the budget Gin rummy exhausted at 0.78 train accuracy, which is
     the honest calibration for how far 500 calls gets you.
 
-    ``temperature`` is consumed by the caller when constructing a real
-    client; the ``LLMClient`` protocol deliberately has no sampling
-    parameters, so a fixture replay cannot drift from its recording.
+    ``temperature`` and ``model_name`` are consumed by ``blotto.cli`` when it
+    builds a real provider client (``_client_from_env``); the ``LLMClient``
+    protocol deliberately has no sampling parameters, so a fixture replay
+    cannot drift from its recording.
     """
 
     model_name: str = "claude-sonnet-4-6"

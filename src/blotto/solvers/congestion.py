@@ -69,7 +69,9 @@ def _residual_share(occupancy: float, config: CongestionConfig) -> float:
         return 1.0 - config.decay_rate * occupancy
     if config.decay == "exponential":
         return math.exp(-config.decay_rate * occupancy)
-    return (1.0 + occupancy) ** (-config.decay_rate)
+    # math.pow rather than ``**`` so the result is a float by construction,
+    # not a float-or-int-by-operand that reads as Any downstream.
+    return math.pow(1.0 + occupancy, -config.decay_rate)
 
 
 def congested_payoff(

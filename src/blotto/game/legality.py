@@ -300,13 +300,16 @@ class LegalityEngine:
                 if commits_budget
                 else self._check_creative_judgement
             )
-            for rule in (
+            # Named separately from the Publish loop's ``rule`` because the
+            # two dispatch over different Move types; one shared name would
+            # force both into a common callable type.
+            for scale_rule in (
                 self._check_drawdown_scale,
                 self._check_coverage,
                 evidence_gate,
                 self._check_velocity,
             ):
-                verdict = rule(move, ctx)
+                verdict = scale_rule(move, ctx)
                 if not verdict.legal:
                     return verdict
             return verdict

@@ -70,8 +70,8 @@ class ISMCTSConfig:
 
     simulations: int = 1000
     """Search budget per move. 1000 matches the per-move budget of Cowling et
-    al. (2012), whose/Search's experiments found it sufficient for strong play
-    on medium-sized games."""
+    al. (2012), whose experiments found it sufficient for strong play on
+    medium-sized games."""
 
     exploration_c: float = math.sqrt(2.0)
     """UCT exploration coefficient. sqrt(2) is the classic Kocsis and Szepesvari

@@ -30,6 +30,8 @@ import hashlib
 import random
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from enum import Enum
+from typing import TypeVar
 
 from blotto.game.types import (
     ActionKey,
@@ -98,7 +100,10 @@ def _parse_kv(token: str, expected: Sequence[str]) -> dict[str, str]:
     return {key: value}
 
 
-def _enum_or_raise(enum_cls: type, raw: str, what: str):
+_E = TypeVar("_E", bound=Enum)
+
+
+def _enum_or_raise(enum_cls: type[_E], raw: str, what: str) -> _E:
     try:
         return enum_cls(raw)
     except ValueError as exc:
@@ -351,7 +356,18 @@ def enumerate_publishes(
     Each yielded publish carries a utm id minted from its own (pre-utm) key
     and ``salt``, so candidate generation is itself reproducible.
     """
-    dims: tuple[list, ...] = (
+    dims: tuple[
+        list[Platform],
+        list[Format],
+        list[Archetype],
+        list[EmotionalVector],
+        list[SemanticTier],
+        list[HookFamily],
+        list[str],
+        list[CtaMode],
+        list[ClaimClass],
+        list[str],
+    ] = (
         list(platforms),
         list(formats),
         list(archetypes),
@@ -371,24 +387,42 @@ def enumerate_publishes(
         total *= len(dim)
 
     def build(flat_index: int) -> Publish:
-        """Decode a flat index into one candidate Publish."""
-        values: list = []
+        """Decode a flat index into one candidate Publish.
+
+        The flat encoding counts the LAST dimension fastest, so decoding
+        peels dimensions off back-to-front; each pick is typed by its own
+        dimension rather than flowing through one untyped list."""
         remaining = flat_index
-        for dim in reversed(dims):
-            values.append(dim[remaining % len(dim)])
-            remaining //= len(dim)
-        values.reverse()
+        angle = dims[9][remaining % len(dims[9])]
+        remaining //= len(dims[9])
+        claim_class = dims[8][remaining % len(dims[8])]
+        remaining //= len(dims[8])
+        cta_mode = dims[7][remaining % len(dims[7])]
+        remaining //= len(dims[7])
+        avatar = dims[6][remaining % len(dims[6])]
+        remaining //= len(dims[6])
+        hook = dims[5][remaining % len(dims[5])]
+        remaining //= len(dims[5])
+        semantic_tier = dims[4][remaining % len(dims[4])]
+        remaining //= len(dims[4])
+        vector = dims[3][remaining % len(dims[3])]
+        remaining //= len(dims[3])
+        archetype = dims[2][remaining % len(dims[2])]
+        remaining //= len(dims[2])
+        format_ = dims[1][remaining % len(dims[1])]
+        remaining //= len(dims[1])
+        platform = dims[0][remaining % len(dims[0])]
         stub = Publish(
-            platform=values[0],
-            format=values[1],
-            archetype=values[2],
-            vector=values[3],
-            semantic_tier=values[4],
-            hook=values[5],
-            avatar=values[6],
-            cta_mode=values[7],
-            claim_class=values[8],
-            angle=values[9],
+            platform=platform,
+            format=format_,
+            archetype=archetype,
+            vector=vector,
+            semantic_tier=semantic_tier,
+            hook=hook,
+            avatar=avatar,
+            cta_mode=cta_mode,
+            claim_class=claim_class,
+            angle=angle,
             utm_content="",
         )
         return Publish(

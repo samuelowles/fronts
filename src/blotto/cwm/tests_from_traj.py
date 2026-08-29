@@ -52,7 +52,6 @@ __all__ = [
     "ModelTest",
     "TestResult",
     "Tolerance",
-    "TestKind",
     "generate",
     "split",
 ]
@@ -60,7 +59,9 @@ __all__ = [
 
 TestKind = str
 """The five kinds above, as plain strings, so a test payload stays JSON-ish
-and a failing refinement prompt can quote it without importing anything."""
+and a failing refinement prompt can quote it without importing anything.
+Kept out of ``__all__``: it annotates this module's own fields and nothing
+outside needs to name it."""
 
 TRANSITION: TestKind = "transition"
 LEGALITY: TestKind = "legality"
@@ -138,6 +139,37 @@ def _metrics(observation: Observation) -> dict[str, float]:
 _ALL_METRICS: tuple[str, ...] = _COUNT_METRICS + _RATE_METRICS
 
 
+def _draw_recorded_chance(
+    outcomes: Sequence[tuple[ActionKey, float]],
+    pending: list[ActionKey],
+    rng: random.Random,
+) -> tuple[ActionKey, bool]:
+    """Resolve one chance node during a replay: the next RECORDED outcome
+    that is legal here, or a fresh draw when the recording has run dry.
+
+    This is the one rule every replay path shares, so it lives once: consume
+    the recorded sequence in order, skipping outcomes that are not legal at
+    the node the model actually reached (a model landing on different chance
+    nodes than the recording is itself a modelling error, and forcing an
+    invalid action to paper over it would corrupt the replay). The flag in
+    the return says whether the draw came from the recording -- a sampled
+    draw makes the caller's measurement degraded, and callers surface that
+    rather than silently averaging it in.
+    """
+    keys = [key for key, _ in outcomes]
+    action: ActionKey | None = None
+    while pending and action is None:
+        candidate = pending.pop(0)
+        if candidate in keys:
+            action = candidate
+    if action is not None:
+        return action, True
+    return (
+        rng.choices(keys, weights=[prob for _, prob in outcomes], k=1)[0],
+        False,
+    )
+
+
 def replay_traced(
     model: CodeWorldModel,
     actions: list[ActionKey],
@@ -158,11 +190,6 @@ def replay_traced(
     ``degraded`` is True when the recorded outcomes ran out and a draw had to be
     sampled. A degraded test is still worth running and is not worth trusting,
     so callers surface the flag rather than silently averaging it in.
-
-    A model may legitimately reach chance nodes at different points than the
-    recording did -- that is itself a modelling error, and one worth seeing. If
-    a recorded outcome is not legal at the node reached, we fall back to
-    sampling and mark the test degraded rather than forcing an invalid action.
     """
     rng = random.Random(seed)
     pending = list(chance or ())
@@ -179,17 +206,9 @@ def replay_traced(
             outcomes = model.chance_outcomes(state)
             if not outcomes:
                 break
-            keys = [key for key, _ in outcomes]
-            action: ActionKey | None = None
-            while pending and action is None:
-                candidate = pending.pop(0)
-                if candidate in keys:
-                    action = candidate
-            if action is None:
+            action, recorded = _draw_recorded_chance(outcomes, pending, rng)
+            if not recorded:
                 degraded = True
-                action = rng.choices(
-                    keys, weights=[prob for _, prob in outcomes], k=1
-                )[0]
             state = model.apply_action(state, action)
             continue
         if index >= len(actions):

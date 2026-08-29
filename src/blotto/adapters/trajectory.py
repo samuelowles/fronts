@@ -46,6 +46,7 @@ except ImportError:
 
     UTC = timezone.utc  # noqa: UP017
 from pathlib import Path
+from typing import TypedDict
 
 from blotto.game.action_space import ActionCodec
 from blotto.game.priors import REPORTING_LAG_HOURS
@@ -110,6 +111,115 @@ def _normalise(moment: datetime) -> datetime:
     return moment.astimezone(UTC).replace(tzinfo=None)
 
 
+class _Record(TypedDict, total=False):
+    """One parsed JSONL line, discriminated by ``kind``.
+
+    ``total=False`` because no single kind carries every key; the per-kind
+    required keys are enforced by ``_validate_record`` at parse time, so the
+    TypedDict states exactly what a reader may find without letting a
+    malformed line through as an untyped ``dict``.
+    """
+
+    kind: str
+    account: str
+    notes: str
+    chance: list[str]
+    action: str
+    observation: dict[str, object]
+
+
+def _validate_record(raw: object, line_number: int) -> _Record:
+    """Narrow one parsed JSON value to a well-formed record, or raise.
+
+    A trajectory file is the single input everything downstream learns from,
+    so a structurally wrong line is corruption rather than noise: it fails
+    HERE, naming the line, instead of as a ``KeyError`` three modules away --
+    or worse, as a silently skipped step that quietly shortens the history the
+    next model is trained on. Unknown ``kind`` values raise for the same
+    reason: the four kinds are the file's whole grammar, and anything else
+    means the store was written by something else.
+    """
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"line {line_number}: record is not a JSON object "
+            f"({type(raw).__name__})"
+        )
+    kind = raw.get("kind")
+    if not isinstance(kind, str):
+        raise ValueError(f"line {line_number}: record has no string 'kind'")
+
+    record: _Record = {"kind": kind}
+    if kind == "header":
+        if "chance" in raw:
+            chance = raw["chance"]
+            if not isinstance(chance, list) or not all(
+                isinstance(key, str) for key in chance
+            ):
+                raise ValueError(
+                    f"line {line_number}: header 'chance' must be a list of "
+                    "strings"
+                )
+            record["chance"] = chance
+    elif kind in ("step", "move"):
+        action = raw.get("action")
+        if not isinstance(action, str):
+            raise ValueError(
+                f"line {line_number}: {kind} record has no string 'action'"
+            )
+        record["action"] = action
+        if kind == "step" and isinstance(raw.get("observation"), dict):
+            record["observation"] = raw["observation"]
+    elif kind == "observation":
+        payload = raw.get("observation")
+        if not isinstance(payload, dict):
+            raise ValueError(
+                f"line {line_number}: observation record has no 'observation' "
+                "object"
+            )
+        if not isinstance(payload.get("utm_content"), str):
+            raise ValueError(
+                f"line {line_number}: observation payload has no string "
+                "'utm_content' -- without the join key the line can attach to "
+                "nothing"
+            )
+        record["observation"] = payload
+    else:
+        raise ValueError(
+            f"line {line_number}: unknown record kind {kind!r}; expected one "
+            "of header/step/move/observation"
+        )
+    if isinstance(raw.get("account"), str):
+        record["account"] = raw["account"]
+    if isinstance(raw.get("notes"), str):
+        record["notes"] = raw["notes"]
+    return record
+
+
+def _text(value: object, field: str) -> str:
+    """A required string field, or a loud refusal naming it."""
+    if not isinstance(value, str):
+        raise TypeError(f"{field} must be a string, got {type(value).__name__}")
+    return value
+
+
+def _whole(value: object, field: str) -> int:
+    """A count field: JSON numbers accepted, anything else refused."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(
+            f"{field} must be a number, got {type(value).__name__}"
+        )
+    return int(value)
+
+
+def _fraction(value: object, field: str) -> float:
+    """A rate field: JSON numbers accepted, anything else refused."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(
+            f"{field} must be a number, got {type(value).__name__}"
+        )
+    return float(value)
+
+
 class TrajectoryStore:
     """JSONL-backed trajectory storage for one account."""
 
@@ -119,14 +229,16 @@ class TrajectoryStore:
 
     # -- reading --------------------------------------------------------------
 
-    def _records(self) -> list[dict]:
-        """Parse every line. A truncated FINAL line is skipped -- that is
-        the one a crash mid-append can leave -- while a malformed line in
-        the middle raises, because interior corruption means the file was
-        rewritten badly and every reading after it is suspect."""
+    def _records(self) -> list[_Record]:
+        """Parse and validate every line. A truncated FINAL line is skipped
+        -- that is the one a crash mid-append can leave -- while anything
+        else that is not a well-formed record raises where it sits: interior
+        corruption means the file was rewritten badly and every reading after
+        it is suspect, and a line that parses as JSON but is not a valid
+        record would otherwise degrade the history quietly."""
         if not self.path.exists():
             return []
-        records: list[dict] = []
+        records: list[_Record] = []
         with open(self.path, encoding="utf-8") as handle:
             lines = handle.readlines()
         for index, line in enumerate(lines):
@@ -134,11 +246,12 @@ class TrajectoryStore:
             if not stripped:
                 continue
             try:
-                records.append(json.loads(stripped))
+                parsed: object = json.loads(stripped)
             except json.JSONDecodeError:
                 if index == len(lines) - 1:
                     continue
                 raise
+            records.append(_validate_record(parsed, index + 1))
         return records
 
     def load(self) -> Trajectory:
@@ -320,8 +433,8 @@ class TrajectoryStore:
         changed = 0
         lines = [line for line in self._raw_lines() if line.strip()]
         rewritten: list[str] = []
-        for line in lines:
-            record = json.loads(line)
+        for index, line in enumerate(lines):
+            record = _validate_record(json.loads(line), index + 1)
             observation = record.get("observation")
             if (
                 record.get("kind") in ("observation", "step")
@@ -348,7 +461,7 @@ class TrajectoryStore:
         with open(self.path, encoding="utf-8") as handle:
             return handle.readlines()
 
-    def _append(self, record: dict) -> None:
+    def _append(self, record: dict[str, object]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(record) + "\n")
@@ -389,25 +502,45 @@ def _index_position(position: dict[str, int], move: Move, index: int) -> None:
         position[move.utm_content] = index
 
 
-def _decode_observation(raw: object) -> Observation | None:
+def _decode_observation(raw: dict[str, object] | None) -> Observation | None:
+    """Rebuild an ``Observation`` from its JSON payload, validating as it goes.
+
+    A missing or wrongly-typed field raises naming the field: the payload
+    crossed a process boundary (it was a file), and the reader who learns a
+    number was a string where a rate belongs is the reader who already trusts
+    the number. Counts and rates accept any JSON number, matching what the
+    store itself writes; a JSON ``int`` for a rate field is a number like any
+    other, not corruption.
+    """
     if raw is None:
         return None
-    return Observation(
-        utm_content=str(raw["utm_content"]),
-        posted_at=str(raw["posted_at"]),
-        observed_at=str(raw["observed_at"]),
-        impressions=int(raw.get("impressions", 0)),
-        reach=int(raw.get("reach", 0)),
-        hook_rate=float(raw.get("hook_rate", 0.0)),
-        hold_rate=float(raw.get("hold_rate", 0.0)),
-        saves=int(raw.get("saves", 0)),
-        shares=int(raw.get("shares", 0)),
-        comments=int(raw.get("comments", 0)),
-        profile_visits=int(raw.get("profile_visits", 0)),
-        link_clicks=int(raw.get("link_clicks", 0)),
-        attributed_conversions=int(raw.get("attributed_conversions", 0)),
-        attribution_coverage=float(raw.get("attribution_coverage", 1.0)),
-        incrementality=float(raw.get("incrementality", 1.0)),
-        is_partial=bool(raw.get("is_partial", False)),
-        dark_social_estimate=float(raw.get("dark_social_estimate", 0.0)),
-    )
+    try:
+        return Observation(
+            utm_content=_text(raw["utm_content"], "utm_content"),
+            posted_at=_text(raw["posted_at"], "posted_at"),
+            observed_at=_text(raw["observed_at"], "observed_at"),
+            impressions=_whole(raw.get("impressions", 0), "impressions"),
+            reach=_whole(raw.get("reach", 0), "reach"),
+            hook_rate=_fraction(raw.get("hook_rate", 0.0), "hook_rate"),
+            hold_rate=_fraction(raw.get("hold_rate", 0.0), "hold_rate"),
+            saves=_whole(raw.get("saves", 0), "saves"),
+            shares=_whole(raw.get("shares", 0), "shares"),
+            comments=_whole(raw.get("comments", 0), "comments"),
+            profile_visits=_whole(raw.get("profile_visits", 0), "profile_visits"),
+            link_clicks=_whole(raw.get("link_clicks", 0), "link_clicks"),
+            attributed_conversions=_whole(
+                raw.get("attributed_conversions", 0), "attributed_conversions"
+            ),
+            attribution_coverage=_fraction(
+                raw.get("attribution_coverage", 1.0), "attribution_coverage"
+            ),
+            incrementality=_fraction(
+                raw.get("incrementality", 1.0), "incrementality"
+            ),
+            is_partial=bool(raw.get("is_partial", False)),
+            dark_social_estimate=_fraction(
+                raw.get("dark_social_estimate", 0.0), "dark_social_estimate"
+            ),
+        )
+    except KeyError as exc:
+        raise ValueError(f"observation payload is missing {exc}") from exc

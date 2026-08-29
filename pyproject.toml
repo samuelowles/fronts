@@ -92,3 +92,12 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 disallow_untyped_defs = true
+
+# The provider SDKs are optional extras imported lazily INSIDE functions (the
+# core must import with nothing installed -- see cwm/llm.py and
+# adapters/composio_io.py). Type-checking must not demand that a machine with
+# no extras installed has stubs for them; ignoring the missing import keeps the
+# import lazy while still checking everything on our side of the call.
+[[tool.mypy.overrides]]
+module = ["anthropic", "anthropic.*", "openai", "openai.*", "composio", "composio.*"]
+ignore_missing_imports = true

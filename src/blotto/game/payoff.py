@@ -29,6 +29,7 @@ __all__ = [
     "true_conversions",
     "reward",
     "ltv_cac_ratio",
+    "allowable_cac",
     "cac_payback_months",
     "health",
 ]
@@ -55,6 +56,21 @@ class Economics:
     cogs_share: float
     fixed_cost_per_post: float
     allowable_cac_share: float = 0.30
+
+    def __post_init__(self) -> None:
+        # gross_margin is "after cost of service", and cost of service
+        # includes cost of goods -- hosting and delivery and support cannot
+        # cost less than the goods alone. A config where the margin implies a
+        # total cost below cogs_share has one of its two numbers wrong, and
+        # every reward computed from it would be quietly denominated in a
+        # contradiction; refuse at the boundary instead.
+        if self.gross_margin + self.cogs_share > 1.0 + _EPS:
+            raise ValueError(
+                f"gross_margin {self.gross_margin} + cogs_share "
+                f"{self.cogs_share} exceeds 1.0: cost of service includes "
+                "cost of goods, so the margin cannot retain more than the "
+                "goods cost -- one of the two numbers is wrong"
+            )
 
 
 def ltv(economics: Economics) -> float:
@@ -115,6 +131,18 @@ def ltv_cac_ratio(economics: Economics, cac_usd: float) -> float:
     if cac_usd <= 0.0:
         return math.inf
     return ltv(economics) / cac_usd
+
+
+def allowable_cac(economics: Economics) -> float:
+    """The most a user may cost to acquire: ``allowable_cac_share`` of LTV.
+
+    This is what the ``Economics.allowable_cac_share`` field DOES -- the
+    corpus ceiling on CAC expressed in dollars, so a caller comparing a real
+    or projected CAC against the ceiling compares like with like
+    (``cac_usd <= allowable_cac(economics)``, equivalently
+    ``ltv_cac_ratio(economics, cac_usd) >= 1 / share``).
+    """
+    return ltv(economics) * economics.allowable_cac_share
 
 
 def cac_payback_months(cac_usd: float, economics: Economics) -> float:

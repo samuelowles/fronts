@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 
 from blotto.game.types import (
     CHANCE_PLAYER,
+    OPERATOR,
     TERMINAL_PLAYER,
     ActionKey,
     State,
@@ -52,8 +53,6 @@ plumbing of its own, and anything callable with (model, state) can play."""
 
 @dataclass(frozen=True, slots=True)
 class ArenaConfig:
-    num_models: int = 5
-    """How many candidate world models to synthesise for the tournament."""
     matches_per_pairing: int = 50
     rejection_threshold: float = 0.10
 
@@ -116,7 +115,7 @@ def play_episode(
                 break
         state = model.apply_action(state, action)
         plies += 1
-    return model.get_rewards(state).get(0, 0.0)
+    return model.get_rewards(state).get(OPERATOR, 0.0)
 
 
 def run(

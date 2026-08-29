@@ -27,6 +27,7 @@ from blotto.cwm.sandbox import Sandbox, SandboxConfig, instantiate
 from blotto.cwm.synth import WORLD_MODEL_CLASS, SynthConfig, synthesise
 from blotto.cwm.tests_from_traj import ModelTest, TestResult
 from blotto.game.types import Trajectory
+from blotto.protocols import CodeWorldModel
 
 __all__ = [
     "RefineConfig",
@@ -68,7 +69,7 @@ class RefinementNode:
     """How many times this node has been selected for refinement."""
     parent: RefinementNode | None = None
     children: list[RefinementNode] = field(default_factory=list)
-    model: object | None = None
+    model: CodeWorldModel | None = None
     """Cached instance, so a node is sandbox-loaded once, not once per
     selection round."""
 
@@ -135,8 +136,15 @@ def refine(
     clears ``min_heuristic_value_gain`` over its parent -- the paper keeps
     refinements that improve and discards the rest, spending the call either
     way, which is what makes the retry budget a real budget.
+
+    The tree's sampling knobs (``heuristic_weight``,
+    ``min_heuristic_value``) are taken from ``config`` rather than left at
+    the tree's own defaults: the config is the object callers tune, and a
+    tuned value that selection silently ignored would be a knob that lies.
     """
     rng = random.Random(config.seed)
+    tree.heuristic_weight = config.heuristic_weight
+    tree.min_heuristic_value = config.min_heuristic_value_on_init
     synth_config = SynthConfig(
         num_tests_on_init=config.num_tests_on_init,
         num_tests_on_error=config.num_tests_on_error,

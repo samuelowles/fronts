@@ -22,7 +22,14 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    # Import statements only, never executed: the runtime import stays inside
+    # ``complete`` so this module loads on a machine with no extras installed.
+    # It exists purely so the ``_client`` fields below can name their type.
+    import anthropic
+    import openai
 
 __all__ = [
     "LLMClient",
@@ -145,7 +152,12 @@ class AnthropicClient:
 
     model: str = "claude-sonnet-4-6"
     max_tokens: int = 8192
-    _client: object | None = field(default=None, repr=False, compare=False)
+    temperature: float = 1.0
+    """Sampling temperature, forwarded on every call. The synthesis loop's
+    own preference (``SynthConfig.temperature``) is the caller's business --
+    the protocol has no sampling parameters so a fixture replay cannot drift
+    from its recording."""
+    _client: anthropic.Anthropic | None = field(default=None, repr=False, compare=False)
 
     def complete(
         self,
@@ -166,6 +178,7 @@ class AnthropicClient:
         message = self._client.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
+            temperature=self.temperature,
             system=system,
             messages=[{"role": "user", "content": user}],
             stop_sequences=stop or [],
@@ -179,7 +192,9 @@ class OpenAIClient:
 
     model: str = "gpt-4.1"
     max_tokens: int = 8192
-    _client: object | None = field(default=None, repr=False, compare=False)
+    temperature: float = 1.0
+    """As in ``AnthropicClient``: forwarded on every call, set by the caller."""
+    _client: openai.OpenAI | None = field(default=None, repr=False, compare=False)
 
     def complete(
         self,
@@ -198,6 +213,7 @@ class OpenAIClient:
         completion = self._client.chat.completions.create(
             model=self.model,
             max_tokens=self.max_tokens,
+            temperature=self.temperature,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},

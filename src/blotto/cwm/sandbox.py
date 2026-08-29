@@ -161,7 +161,7 @@ class _ForbiddenVisitor(ast.NodeVisitor):
         self.bound = bound
         self.violations: list[str] = []
 
-    def _flag(self, node: ast.AST, what: str) -> None:
+    def _flag(self, node: ast.stmt | ast.expr, what: str) -> None:
         self.violations.append(
             f"{what} ({type(node).__name__}) at line {node.lineno}"
         )
@@ -215,18 +215,26 @@ def _check_source(source: str, bound: list[str]) -> None:
 class _CappedBuffer(io.StringIO):
     """Output sink that refuses to buffer past the cap, so a model that
     prints its way through the memory budget fails loudly instead of
-    quietly."""
+    quietly.
+
+    The cap counts UTF-8 BYTES, matching the ``max_output_bytes`` name:
+    ``StringIO.tell()`` counts characters, and a model printing emoji or CJK
+    text gets several bytes per character -- a character-counted cap would
+    quietly admit multiples of the budget the config names."""
 
     def __init__(self, cap: int) -> None:
         super().__init__()
         self._cap = cap
+        self._bytes_written = 0
 
     def write(self, text: str) -> int:
-        if self.tell() + len(text) > self._cap:
+        size = len(text.encode("utf-8"))
+        if self._bytes_written + size > self._cap:
             raise SandboxViolation(
                 f"sandboxed output exceeded {self._cap} bytes -- write less, "
                 "or raise SandboxConfig.max_output_bytes"
             )
+        self._bytes_written += size
         return super().write(text)
 
 
@@ -464,7 +472,10 @@ def instantiate(namespace: types.ModuleType, class_name: str) -> CodeWorldModel:
     Raises ``ProtocolViolation`` listing EVERY missing or mis-signatured
     method -- all at once, because the failing method list is the refinement
     prompt's most useful content and dribbling it out one method per
-    synthesis round is how call budgets die.
+    synthesis round is how call budgets die. The final ``isinstance`` check
+    is the same claim restated for the type checker: after the arity table
+    has passed, the instance must also satisfy the runtime-checkable
+    protocol itself.
     """
     cls = getattr(namespace, class_name, None)
     if cls is None:
@@ -473,7 +484,7 @@ def instantiate(namespace: types.ModuleType, class_name: str) -> CodeWorldModel:
             f"available names: {sorted(vars(namespace))}"
         )
     try:
-        instance = cls()
+        instance: object = cls()
     except Exception as exc:
         raise ProtocolViolation(
             f"{class_name} could not be constructed with no arguments: {exc}"
@@ -481,7 +492,12 @@ def instantiate(namespace: types.ModuleType, class_name: str) -> CodeWorldModel:
     problems = check_protocol_methods(instance, CWM_METHOD_PARAMS, class_name)
     if problems:
         raise ProtocolViolation("; ".join(problems))
-    return instance  # type: ignore[return-value]
+    if not isinstance(instance, CodeWorldModel):
+        raise ProtocolViolation(
+            f"{class_name} satisfies the method table but not the "
+            "CodeWorldModel protocol"
+        )
+    return instance
 
 
 # ---------------------------------------------------------------------------
@@ -533,15 +549,20 @@ _SAFE_BUILTIN_NAMES = (
 
 
 class _Capped(io.StringIO):
+    # Counts UTF-8 bytes, not characters, for the same reason the parent's
+    # _CappedBuffer does: the cap's name promises bytes.
     def __init__(self, cap):
         super().__init__()
         self._cap = cap
+        self._bytes_written = 0
 
     def write(self, text):
-        if self.tell() + len(text) > self._cap:
+        size = len(text.encode("utf-8"))
+        if self._bytes_written + size > self._cap:
             raise RuntimeError(
                 f"sandboxed output exceeded {self._cap} bytes"
             )
+        self._bytes_written += size
         return super().write(text)
 
 
@@ -643,7 +664,7 @@ def _revive(value: object) -> object:
         if marker == "Observation":
             fields = {k: v for k, v in value.items() if k != "__dataclass__"}
             try:
-                return Observation(**fields)  # type: ignore[arg-type]
+                return Observation(**fields)
             except TypeError:
                 # A child-side class that shares only the name; hand back the
                 # plain dict rather than losing the value.
@@ -708,8 +729,21 @@ class _RemoteClass:
                 f"constructing {self._name} in the child failed: "
                 f"{reply.get('error', 'unknown error')}"
             )
+        handle = reply.get("handle")
+        methods = reply.get("methods")
+        # The reply crossed a process boundary; trust nothing about its
+        # shape until it has been checked.
+        if (
+            not isinstance(handle, int)
+            or isinstance(handle, bool)
+            or not isinstance(methods, list)
+            or not all(isinstance(name, str) for name in methods)
+        ):
+            raise SandboxViolation(
+                f"constructing {self._name} returned a malformed reply"
+            )
         return _RemoteInstance(
-            self._sandbox, reply["handle"], reply["methods"], self._sandbox._timeout
+            self._sandbox, handle, methods, self._sandbox._timeout
         )
 
 
@@ -777,8 +811,13 @@ class SubprocessSandbox:
                 "subprocess sandbox refused or failed the source: "
                 f"{reply.get('error', 'unknown error')}"
             )
-        classes = set(reply.get("classes", []))
-        names = set(reply.get("names", []))
+        raw_classes = reply.get("classes", [])
+        raw_names = reply.get("names", [])
+        if not isinstance(raw_classes, list) or not isinstance(raw_names, list):
+            self.close()
+            raise SandboxViolation("child sent a malformed load acknowledgement")
+        classes = {name for name in raw_classes if isinstance(name, str)}
+        names = {name for name in raw_names if isinstance(name, str)}
         sandbox = self
 
         def module_getattr(name: str) -> object:
@@ -793,7 +832,9 @@ class SubprocessSandbox:
         module.__dict__["__sandbox__"] = self
         return module
 
-    def _request(self, payload: dict[str, object], timeout: float | None = None) -> dict:
+    def _request(
+        self, payload: dict[str, object], timeout: float | None = None
+    ) -> dict[str, object]:
         """Send one JSON request, return the child's reply dict, hard-killing
         the child if it does not answer inside the budget."""
         proc = self._proc
@@ -818,8 +859,16 @@ class SubprocessSandbox:
             detail = self._stderr_tail()
             self.close()
             raise SandboxViolation(f"child process exited before replying: {detail}")
-        reply = json.loads(line)
-        return _revive(reply)  # type: ignore[no-any-return]
+        reply = _revive(json.loads(line))
+        # The protocol is one JSON OBJECT per line; anything else means the
+        # child is misbehaving or dead, and handing an unvalidated value back
+        # would move the failure into whichever caller unpacks it next.
+        if not isinstance(reply, dict):
+            self.close()
+            raise SandboxViolation(
+                f"child replied with a {type(reply).__name__}, not a JSON object"
+            )
+        return reply
 
     def _value(
         self, payload: dict[str, object], timeout: float | None = None

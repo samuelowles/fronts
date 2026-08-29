@@ -211,10 +211,12 @@ class ReferenceWorldModel:
     # -- State helpers --------------------------------------------------------
 
     def _hidden(self, state: State) -> dict[str, Any]:
-        return state["hidden"]
+        hidden: dict[str, Any] = state["hidden"]
+        return hidden
 
     def _day(self, state: State) -> int:
-        return state["hidden"]["step"]
+        day: int = state["hidden"]["step"]
+        return day
 
     def _serialise_hidden(self, hidden: HiddenState) -> dict[str, Any]:
         theta = hidden.theta
