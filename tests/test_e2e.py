@@ -26,6 +26,10 @@ The eight scenarios, in the order an operator would meet them:
 6. Hostile synthesis output degrades to weaker play, never a crash.
 7. The same seed produces a byte-identical plan in a fresh process.
 8. All of it works with the network physically unavailable.
+
+Plus the synth -> plan handoff: the inference sampler persisted beside the
+model is found by ``plan`` (which names its determinization either way) and
+scored by ``accuracy`` (whose inference column is n/a until then).
 """
 
 from __future__ import annotations
@@ -802,6 +806,66 @@ def test_same_seed_produces_an_identical_plan_in_a_fresh_process(
     )
     payload = json.loads(outputs[0].decode("utf-8"))
     assert payload["moves"], "the deterministic plan must contain moves"
+
+
+# ---------------------------------------------------------------------------
+# The synth -> plan handoff: the persisted inference sampler.
+# ---------------------------------------------------------------------------
+
+
+PLAN_SAMPLER_SOURCE = '''\
+class StateInferenceSampler:
+    def resample_state(self, obs_action_history, player_id):
+        return {"day": 0, "phase": "operator", "posts": [], "last": None}
+'''
+
+
+def test_plan_determinizes_with_the_sampler_beside_the_model(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """``blotto synth`` writes ``inference.py`` beside the model; ``plan``
+    must find it, name the determinization it used, and stay deterministic.
+    Without the file the same plan runs open-loop -- and says that instead,
+    because a planner that will not name its determinization is a planner
+    whose confidence cannot be audited."""
+    (tmp_path / "model.py").write_text(V2_SOURCE, encoding="utf-8")
+    config = _write_config(tmp_path)
+    argv = ["plan", "--config", str(config), "--seed", "7", "--sims", "40",
+            "--days", "1"]
+
+    assert app(argv) == 0
+    assert "determinization: open-loop" in capsys.readouterr().out
+
+    (tmp_path / "inference.py").write_text(PLAN_SAMPLER_SOURCE, encoding="utf-8")
+    assert app(argv) == 0
+    first = capsys.readouterr().out
+    assert "determinization: synthesised sampler" in first
+    assert app(argv) == 0
+    assert first == capsys.readouterr().out, (
+        "a deterministic sampler must leave the plan deterministic"
+    )
+
+
+def test_accuracy_scores_the_sampler_when_one_is_persisted(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """With no sampler on disk the inference column reads n/a; with one it
+    carries measured numbers -- possibly damning ones, which is the point."""
+    (tmp_path / "model.py").write_text(V2_SOURCE, encoding="utf-8")
+    config = _write_config(tmp_path)
+    TrajectoryStore(tmp_path / "history.jsonl").save(_settled_history(5))
+
+    assert app(["accuracy", "--config", str(config), "--seed", "3"]) == 0
+    without = capsys.readouterr().out
+    assert "until a sampler is synthesised" in without
+
+    (tmp_path / "inference.py").write_text(PLAN_SAMPLER_SOURCE, encoding="utf-8")
+    assert app(["accuracy", "--config", str(config), "--seed", "3"]) == 0
+    with_sampler = capsys.readouterr().out
+    assert "autoencoder pass rate" in with_sampler
+    assert with_sampler.count("n/a") == 1, (
+        "train and online carry measurements; only the test split stays n/a"
+    )
 
 
 # ---------------------------------------------------------------------------

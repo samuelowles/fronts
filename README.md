@@ -264,11 +264,13 @@ solution concept for how well it is actually justified. The signalling module in
 particular is an analogy resting on assumptions that do not cleanly hold, and
 says so in its own docstring.
 
-Two more gaps, stated plainly. The shipped `blotto plan` determinizes
-uniformly — the closed-deck state-inference sampler (`cwm/inference`) is
-exercised by the test suite and available through the API, but not yet wired
-into the CLI. And `blotto accuracy` reports the inference column as `n/a`
-rather than inventing a number for it, for the same reason.
+One more caveat, stated plainly. `blotto synth` writes a state-inference
+sampler beside the world model, `blotto plan` determinizes with it when it
+loads — and prints `open-loop` when it does not — and `blotto accuracy`
+scores it. But that score is an autoencoder pass rate: it certifies that
+samples are not *contradicted* by your observations, never that they are
+correctly *distributed* (`cwm/inference` opens with exactly this warning).
+A plan under the sampler is better-informed, not clairvoyant.
 
 ---
 

@@ -24,7 +24,7 @@ from datetime import date
 # Importing every new module IS the first check: a module that cannot be
 # imported cannot be wrong in interesting ways, only boring ones.
 from blotto.game import action_space, legality, payoff, priors
-from blotto.game.action_space import ActionCodec, AngleRegistry
+from blotto.game.action_space import ActionCodec
 from blotto.game.legality import (
     LegalityContext,
     LegalityEngine,
@@ -130,13 +130,11 @@ def _observation(
 def modules_import() -> None:
     """Every new module imports and exposes its public surface."""
     assert hasattr(action_space, "ActionCodec")
-    assert hasattr(action_space, "AngleRegistry")
     assert hasattr(action_space, "enumerate_publishes")
     assert hasattr(action_space, "utm_content_id")
     assert hasattr(legality, "LegalityEngine")
     assert hasattr(payoff, "reward")
     assert hasattr(priors, "ARCHETYPE_PRIORS")
-    assert AngleRegistry() is not None
 
 
 @check

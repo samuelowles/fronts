@@ -60,6 +60,11 @@ blotto accuracy    # train / test / online, transition and inference
 blotto arena       # candidate strategies play inside the models
 ```
 
+`synth` writes two artefacts side by side: the world model and an
+`inference.py` sampler that `plan` determinizes with. If the sampler fails to
+synthesise or load, `plan` says `open-loop` in its output — a weaker search,
+not a broken one, and worth re-running `synth` to fix.
+
 Re-synthesis cadence is a genuine open question and weekly is a guess. The
 reference paper synthesises once, offline, and names online learning as future
 work. Distribution moves faster than a board game's rules, so more often is

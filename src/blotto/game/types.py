@@ -62,7 +62,6 @@ __all__ = [
     "Observation",
     "Trajectory",
     "Step",
-    "EvidenceGate",
     "sample_chance_outcome",
 ]
 
@@ -464,7 +463,7 @@ class Trajectory:
 # ---------------------------------------------------------------------------
 # Evidence gates.
 #
-# The single most consequential type in this file. A gate is a precondition on
+# The single most consequential idea in this file. A gate is a precondition on
 # acting, not a penalty for acting. Both corpora independently arrive at the
 # same conclusion -- that the dominant failure mode in distribution is not bad
 # creative but premature scaling -- and both state it numerically:
@@ -480,21 +479,6 @@ class Trajectory:
 #
 # The two thresholds differ because the decisions differ: 50/7d licenses a
 # creative-level judgement, 300/14d licenses a spend commitment. Both are
-# expressed here and both are enforced.
+# enforced in ``blotto.game.legality`` -- ``OperatorPolicy`` carries the
+# thresholds, and every refusal cites its corpus source at the refusal site.
 # ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class EvidenceGate:
-    """A precondition that must be satisfied before a class of move is legal."""
-
-    name: str
-    min_conversions: int
-    window_days: int
-    min_reach: int = 0
-    min_attribution_coverage: float = 0.0
-    requires_settled: bool = True
-    """If True, observations still inside the reporting lag do not count toward
-    the threshold. Peeking at partial data is the failure this prevents."""
-    source: str = ""
-    """Citation. A gate without a source is not permitted to exist."""

@@ -25,7 +25,9 @@ from blotto.cwm.arena import run as arena_run
 from blotto.cwm.inference import (
     FallbackInference,
     inference_accuracy,
+    load_state_inference,
     synthesise_state_inference,
+    synthesise_state_inference_source,
     validate_history,
 )
 from blotto.cwm.llm import (
@@ -825,6 +827,30 @@ def test_state_inference_synthesises_from_fixture() -> None:
     state = inference.resample_state([(None, ACTION_A)], 0)
     assert isinstance(state, dict)
     assert "theta" in state
+
+
+def test_state_inference_source_persists_and_reloads() -> None:
+    """The synth -> plan handoff: what ``blotto synth`` writes to disk,
+    ``blotto plan`` must read back as the same working sampler."""
+    client = RecordedClient(FIXTURES / "state_inference.jsonl")
+    source = synthesise_state_inference_source(
+        client, SynthConfig(), RULES_TEXT, [make_trajectory()]
+    )
+    assert source is not None
+    sampler = load_state_inference(source)
+    assert sampler is not None
+    state = sampler.resample_state([(None, ACTION_A)], 0)
+    assert isinstance(state, dict)
+    assert "theta" in state
+
+
+def test_load_state_inference_round_trips_and_rejects() -> None:
+    sampler = load_state_inference(INFERENCE_SOURCE)
+    assert sampler is not None
+    assert sampler.resample_state([], 0)["theta"]["hook_rate"] == 1.1
+    assert load_state_inference("x = 1\n") is None, (
+        "source without the sampler class must not load"
+    )
 
 
 def test_state_inference_falls_back_when_synthesis_fails() -> None:

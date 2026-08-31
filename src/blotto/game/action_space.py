@@ -29,7 +29,7 @@ from __future__ import annotations
 import hashlib
 import random
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from enum import Enum
 from typing import TypeVar
 
@@ -54,7 +54,6 @@ from blotto.game.types import (
 __all__ = [
     "ActionDecodeError",
     "ActionCodec",
-    "AngleRegistry",
     "enumerate_publishes",
     "utm_content_id",
     "restamp_unique",
@@ -256,62 +255,6 @@ class ActionCodec:
                 f"kill fields out of order: expected {_KILL_KEYS}"
             )
         return Kill(angle=fields["angle"], reason=fields["reason"])
-
-
-@dataclass(frozen=True, slots=True)
-class AngleRecord:
-    """One angle: what it is, and what class of claim it is allowed to carry.
-
-    ``required_claim_class`` is the claim the angle *promises* the audience --
-    launch theatre without first-party proof is just noise -- so the registry
-    doubles as a coarse quality floor on the contested resource.
-    """
-
-    angle_id: str
-    description: str
-    required_claim_class: ClaimClass
-
-
-class AngleRegistry:
-    """Angle id -> record. Angles are minted at runtime by the planner, not
-    seeded here, because which angles exist is a property of the campaign
-    under way, not of the game.
-
-    Congestion -- the field's share of an angle -- is computed per angle id,
-    which is why the id must be a stable string rather than an object
-    identity: it survives serialisation into an ``ActionKey`` and back.
-    """
-
-    def __init__(self) -> None:
-        self._records: dict[str, AngleRecord] = {}
-
-    def register(
-        self,
-        angle_id: str,
-        description: str,
-        required_claim_class: ClaimClass,
-    ) -> AngleRecord:
-        """Idempotently register an angle and return its record."""
-        record = AngleRecord(angle_id, description, required_claim_class)
-        self._records[angle_id] = record
-        return record
-
-    def get(self, angle_id: str) -> AngleRecord | None:
-        return self._records.get(angle_id)
-
-    def describe(self, angle_id: str) -> str:
-        record = self._records.get(angle_id)
-        return record.description if record else ""
-
-    def requirement(self, angle_id: str) -> ClaimClass | None:
-        record = self._records.get(angle_id)
-        return record.required_claim_class if record else None
-
-    def __contains__(self, angle_id: str) -> bool:
-        return angle_id in self._records
-
-    def __len__(self) -> int:
-        return len(self._records)
 
 
 def utm_content_id(move: Move, salt: str) -> str:

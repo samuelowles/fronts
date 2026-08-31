@@ -68,7 +68,6 @@ from blotto.game.types import (
     ClaimClass,
     CtaMode,
     EmotionalVector,
-    EvidenceGate,
     Format,
     HookFamily,
     Observation,
@@ -471,32 +470,16 @@ def test_signalling_config_guards_the_zero_denominator() -> None:
         SignallingConfig(epsilon=0.0)
 
 
-def test_evidence_gate_expresses_the_thresholds_the_policy_enforces() -> None:
-    """``blotto.game.types`` states both corpus gates are expressed as
-    EvidenceGate AND enforced; this pins the two halves together so neither
-    drifts alone."""
-    creative = EvidenceGate(
-        name="creative_judgement",
-        min_conversions=50,
-        window_days=7,
-        source="Storytelling Engineer/"
-        "17_A_B_Testing_Story_Arcs_Statistical_Significance_in_Emotion.md",
-    )
-    spend = EvidenceGate(
-        name="spend_commitment",
-        min_conversions=300,
-        window_days=14,
-        source=(
-            "GTM Engineer/Encyclopedia/08_Landing_Pages_and_CRO.md; "
-            "GTM Engineer/Encyclopedia/04_The_100x_Engineer_Mindset.md"
-        ),
-    )
+def test_operator_policy_defaults_are_the_corpus_gates() -> None:
+    """The two corpus gates -- 50/7d creative judgement, 300/14d spend
+    commitment (``blotto.game.types``, "Evidence gates") -- are what
+    ``OperatorPolicy`` enforces by default; this pins the numbers so a
+    tuning edit has to be deliberate, not a drive-by."""
     policy = OperatorPolicy()
-    assert creative.min_conversions == policy.creative_judgement_min_conversions
-    assert creative.window_days == policy.creative_judgement_window_days
-    assert spend.min_conversions == policy.spend_commitment_min_conversions
-    assert spend.window_days == policy.spend_commitment_min_days
-    assert creative.source and spend.source, "a gate without a source may not exist"
+    assert policy.creative_judgement_min_conversions == 50
+    assert policy.creative_judgement_window_days == 7
+    assert policy.spend_commitment_min_conversions == 300
+    assert policy.spend_commitment_min_days == 14
 
 
 def test_low_risk_claim_classes_is_the_verifiability_line() -> None:

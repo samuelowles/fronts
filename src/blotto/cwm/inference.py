@@ -59,6 +59,8 @@ __all__ = [
     "HISTORY_INFERENCE_CLASS",
     "FallbackInference",
     "synthesise_state_inference",
+    "synthesise_state_inference_source",
+    "load_state_inference",
     "synthesise_history_inference",
     "validate_history",
     "inference_accuracy",
@@ -158,19 +160,14 @@ def _inference_prompt(
     return system, "\n".join(lines)
 
 
-def _load_inference_class(
-    client: LLMClient,
-    config: SynthConfig,
-    system: str,
-    user: str,
-    class_name: str,
-    methods: dict[str, int],
+def _verified_instance(
+    source: str, class_name: str, methods: dict[str, int]
 ) -> object | None:
-    """Complete, extract, sandbox, verify. None on any failure -- the caller
-    falls back rather than propagating, per the module contract."""
+    """Sandbox-load ``source`` and return a verified ``class_name`` instance,
+    or None on any failure -- callers fall back rather than propagate, per
+    the module contract."""
     try:
-        response = client.complete(system, user)
-        namespace = Sandbox().load(extract_code(response), SandboxConfig())
+        namespace = Sandbox().load(source, SandboxConfig())
         cls = getattr(namespace, class_name, None)
         if cls is None:
             return None
@@ -180,6 +177,26 @@ def _load_inference_class(
         return instance
     except Exception:
         return None
+
+
+def _load_inference_class(
+    client: LLMClient,
+    config: SynthConfig,
+    system: str,
+    user: str,
+    class_name: str,
+    methods: dict[str, int],
+) -> tuple[object, str] | None:
+    """Complete, extract, sandbox, verify. Returns (instance, source) so a
+    caller can persist what it just verified; None on any failure."""
+    try:
+        source = extract_code(client.complete(system, user))
+    except Exception:
+        return None
+    instance = _verified_instance(source, class_name, methods)
+    if instance is None:
+        return None
+    return instance, source
 
 
 def synthesise_state_inference(
@@ -203,11 +220,53 @@ def synthesise_state_inference(
         rules,
         trajectories,
     )
-    instance = _load_inference_class(
+    loaded = _load_inference_class(
         client, config, system, user, STATE_INFERENCE_CLASS, _STATE_METHODS
     )
-    if instance is None or not isinstance(instance, StateInference):
+    if loaded is None or not isinstance(loaded[0], StateInference):
         return FallbackInference(model=fallback_model)
+    return loaded[0]
+
+
+def synthesise_state_inference_source(
+    client: LLMClient,
+    config: SynthConfig,
+    rules: str,
+    trajectories: list[Trajectory],
+) -> str | None:
+    """Synthesise a ``resample_state`` sampler and return its SOURCE.
+
+    This is what ``blotto synth`` persists beside the world model, so a later
+    ``blotto plan`` in a fresh process can sandbox-load the same sampler with
+    ``load_state_inference``. None when synthesis fails -- the caller plans
+    open-loop and says so, rather than writing a file that will not load.
+    """
+    system, user = _inference_prompt(
+        "closed-deck state inference",
+        STATE_INFERENCE_CLASS,
+        "resample_state",
+        rules,
+        trajectories,
+    )
+    loaded = _load_inference_class(
+        client, config, system, user, STATE_INFERENCE_CLASS, _STATE_METHODS
+    )
+    if loaded is None or not isinstance(loaded[0], StateInference):
+        return None
+    return loaded[1]
+
+
+def load_state_inference(source: str) -> StateInference | None:
+    """Sandbox-load a persisted ``resample_state`` sampler.
+
+    None when the source does not load or does not satisfy the protocol; the
+    caller chooses its own degradation. ``blotto plan`` degrades to open-loop
+    search against the true state -- NOT ``FallbackInference``, whose
+    initial-state resample would silently discard the episode's progress.
+    """
+    instance = _verified_instance(source, STATE_INFERENCE_CLASS, _STATE_METHODS)
+    if instance is None or not isinstance(instance, StateInference):
+        return None
     return instance
 
 
@@ -228,12 +287,12 @@ def synthesise_history_inference(
         rules,
         trajectories,
     )
-    instance = _load_inference_class(
+    loaded = _load_inference_class(
         client, config, system, user, HISTORY_INFERENCE_CLASS, _HISTORY_METHODS
     )
-    if instance is None or not isinstance(instance, HistoryInference):
+    if loaded is None or not isinstance(loaded[0], HistoryInference):
         return FallbackInference(model=fallback_model)
-    return instance
+    return loaded[0]
 
 
 def validate_history(

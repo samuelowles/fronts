@@ -19,7 +19,6 @@ from blotto.game import priors
 from blotto.game.action_space import (
     ActionCodec,
     ActionDecodeError,
-    AngleRegistry,
     enumerate_publishes,
     utm_content_id,
 )
@@ -328,15 +327,6 @@ def test_enumerate_publishes_small_space_enumerates_all() -> None:
         )
     )
     assert len(moves) == 2
-
-
-def test_angle_registry_round_trip() -> None:
-    registry = AngleRegistry()
-    registry.register(ANGLE, "Launch as public theatre", ClaimClass.FIRST_PARTY_PROOF)
-    assert ANGLE in registry
-    assert registry.describe(ANGLE) == "Launch as public theatre"
-    assert registry.requirement(ANGLE) is ClaimClass.FIRST_PARTY_PROOF
-    assert registry.get("nope") is None
 
 
 # ---------------------------------------------------------------------------

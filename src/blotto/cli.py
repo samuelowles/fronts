@@ -45,6 +45,11 @@ from blotto.config import BlottoConfig, default_config
 from blotto.config import load as load_config
 from blotto.cwm.arena import ArenaConfig
 from blotto.cwm.arena import run as arena_run
+from blotto.cwm.inference import (
+    inference_accuracy,
+    load_state_inference,
+    synthesise_state_inference_source,
+)
 from blotto.cwm.llm import AnthropicClient, OpenAIClient
 from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
 from blotto.cwm.refine import RefineConfig, RefinementNode, RefinementTree
@@ -62,6 +67,7 @@ from blotto.cwm.tests_from_traj import (
 )
 from blotto.game.action_space import ActionCodec, ActionDecodeError, restamp_unique
 from blotto.game.legality import LegalityContext, LegalityEngine
+from blotto.game.payoff import allowable_cac, ltv
 from blotto.game.types import (
     CHANCE_PLAYER,
     OPERATOR,
@@ -76,7 +82,7 @@ from blotto.game.types import (
     Trajectory,
     sample_chance_outcome,
 )
-from blotto.protocols import CodeWorldModel
+from blotto.protocols import CodeWorldModel, StateInference
 from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig
 
 __all__ = ["app"]
@@ -212,6 +218,12 @@ def _load_model_source(path: Path) -> CodeWorldModel:
     source = Path(path).read_text(encoding="utf-8")
     namespace = Sandbox().load(source, SandboxConfig())
     return instantiate(namespace, WORLD_MODEL_CLASS)
+
+
+def _inference_path(model_path: Path) -> Path:
+    """The sampler lives beside the model it conditions on: one artefact
+    pair, moved and versioned together, no second config knob."""
+    return model_path.with_name("inference.py")
 
 
 def _sample_chance(model: CodeWorldModel, state: State, rng: random.Random) -> ActionKey:
@@ -465,10 +477,25 @@ def _cmd_synth(args: argparse.Namespace) -> int:
     winner = best_node(tree)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(winner.source, encoding="utf-8")
+
+    # One more call buys the closed-deck sampler ISMCTS determinizes with
+    # (PAPER.md s6). Written beside the model so a later `blotto plan` in a
+    # fresh process finds the pair together.
+    inference_source = synthesise_state_inference_source(
+        client, synth_config, rules_text, [trajectory]
+    )
+    inference_path = _inference_path(out_path)
+    if inference_source is not None:
+        inference_path.write_text(inference_source, encoding="utf-8")
+
     print(f"synthesised model written to {out_path}")
     print(f"  candidates:   {len(tree.nodes)}")
     print(f"  pass rate:    {winner.h:.2f} on {len(tests)} settled-history tests")
-    print(f"  llm calls:    {1 + sum(node.refinements for node in tree.nodes)}")
+    if inference_source is not None:
+        print(f"  inference:    sampler written to {inference_path}")
+    else:
+        print("  inference:    synthesis failed; `blotto plan` will run open-loop")
+    print(f"  llm calls:    {2 + sum(node.refinements for node in tree.nodes)}")
     print("  next: `blotto accuracy` before trusting `blotto plan`")
     return EXIT_OK
 
@@ -507,24 +534,52 @@ def _cmd_accuracy(args: argparse.Namespace) -> int:
     online_tests = generate(online_trajectory, Tolerance(), include_hidden=False)
     online_rate, online_passed, online_total = pass_rate(online_tests)
 
-    # The inference columns stay at their None default: this command has no
-    # synthesised sampler to score, and a column that mirrored the transition
-    # numbers would be a measurement that never happened.
+    # Score the persisted sampler when there is one; unmeasured stays None
+    # (rendered n/a), because a column that mirrored the transition numbers
+    # would be a measurement that never happened. The test column has no
+    # inference reading either way: that split is over generated tests, and
+    # inference is scored over trajectories.
+    inference_train: float | None = None
+    inference_online: float | None = None
+    inference_path = _inference_path(model_path)
+    sampler = (
+        load_state_inference(inference_path.read_text(encoding="utf-8"))
+        if inference_path.exists()
+        else None
+    )
+    if sampler is not None:
+        inference_train = inference_accuracy(model, sampler, [trajectory], mode="state")
+        inference_online = inference_accuracy(
+            model, sampler, [online_trajectory], mode="state"
+        )
+
     report = ModelQualityReport(
         transition_accuracy_train=train_rate,
         transition_accuracy_test=test_rate,
         transition_accuracy_online=online_rate,
+        inference_accuracy_train=inference_train,
+        inference_accuracy_online=inference_online,
         llm_calls=0,
         passed_tests=train_passed + test_passed,
         total_tests=train_total + test_total,
     )
     print(f"model: {model_path}")
     print(report.format_table())
+    if sampler is None:
+        inference_note = (
+            "inference is n/a until a sampler is synthesised and scored "
+            "(blotto synth writes one beside the model)."
+        )
+    else:
+        inference_note = (
+            "inference is the sampler's autoencoder pass rate -- support "
+            "membership, not density (blotto.cwm.inference) -- on recorded "
+            "history (train) and self-play (online)."
+        )
     print(
         "note: splits are pass rates on closed-deck "
         f"{OBSERVATION_RECONSTRUCTION} tests; the online split is self-play "
-        "consistency, not the paper's live protocol. inference is n/a until "
-        "a sampler is synthesised and scored (blotto.cwm.inference)."
+        f"consistency, not the paper's live protocol. {inference_note}"
     )
     return EXIT_OK
 
@@ -540,8 +595,20 @@ def _cmd_plan(args: argparse.Namespace) -> int:
         )
         return EXIT_ERROR
     model = _load_model_source(model_path)
+    inference: StateInference | None = None
+    inference_path = _inference_path(model_path)
+    if inference_path.exists():
+        inference = load_state_inference(inference_path.read_text(encoding="utf-8"))
+        if inference is None:
+            # Open-loop against the true state, not FallbackInference: its
+            # initial-state resample would discard the episode's progress.
+            print(
+                f"inference sampler at {inference_path} failed to load; "
+                "planning open-loop against the observable state",
+                file=sys.stderr,
+            )
     rng = _rng(args)
-    planner = ISMCTS(ISMCTSConfig(seed=_seed_from_args(args)))
+    planner = ISMCTS(ISMCTSConfig(seed=_seed_from_args(args)), inference=inference)
 
     state = model.initial_state()
     moves: list[str] = []
@@ -581,6 +648,11 @@ def _cmd_plan(args: argparse.Namespace) -> int:
         print(json.dumps({"moves": moves, "decisions": decisions}, indent=2))
         return EXIT_OK
     print(f"plan for {len(moves)} decision(s) written to {plan_path}")
+    print(
+        "determinization: synthesised sampler (closed-deck)"
+        if inference is not None
+        else "determinization: open-loop -- no inference sampler beside the model"
+    )
     for index, decision in enumerate(decisions):
         print(f"\ndecision {index + 1}: {decision['move']}")
         print(f"  {'action':<62} {'visits':>6} {'value':>14}")
@@ -798,6 +870,13 @@ def _cmd_stats(args: argparse.Namespace) -> int:
     print(f"  unmatched utm ids:     {stats.unmatched_utm}")
     print(f"  archetypes covered:    {stats.archetypes}")
     print(f"  platforms covered:     {stats.platforms}")
+    economics = config.economics
+    print(
+        f"  unit economics:        LTV ${ltv(economics):,.0f}, allowable CAC "
+        f"${allowable_cac(economics):,.0f} "
+        f"({economics.allowable_cac_share:.0%} of LTV -- the ceiling every "
+        "acquisition bet is judged against)"
+    )
     if stats.ready_for_synthesis:
         print("  cold start: CLEARED (>=30 settled across >=2 archetypes, >=2 platforms)")
     else:
