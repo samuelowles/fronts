@@ -11,3 +11,10 @@ build/
 .mypy_cache/
 runs/
 .DS_Store
+
+# Local AI-tooling state; never part of the repository.
+.claude/
+.claude-flow/
+.remember/
+CLAUDE.md
+.mcp.json

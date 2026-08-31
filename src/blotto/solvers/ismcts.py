@@ -408,7 +408,10 @@ class ISMCTS:
                         break
                     action = rng.choice(legal)
                 rollout_state = model.apply_action(rollout_state, action)
-                total += model.get_rewards(rollout_state).get(player, 0.0)
+            # One reading at the end, exactly like the terminal branch above:
+            # get_rewards is cumulative-to-date, so summing it per ply would
+            # count a reward that settles early up to rollout_depth times.
+            total += model.get_rewards(rollout_state).get(player, 0.0)
         return total / self._config.rollouts_per_leaf
 
     def _sample_chance(

@@ -45,6 +45,7 @@ from blotto.game.types import (
     Observation,
     State,
     Trajectory,
+    sample_chance_outcome,
 )
 from blotto.protocols import CodeWorldModel
 
@@ -164,10 +165,7 @@ def _draw_recorded_chance(
             action = candidate
     if action is not None:
         return action, True
-    return (
-        rng.choices(keys, weights=[prob for _, prob in outcomes], k=1)[0],
-        False,
-    )
+    return sample_chance_outcome(outcomes, rng), False
 
 
 def replay_traced(
@@ -407,11 +405,7 @@ class ModelTest:
                 outcomes = model.chance_outcomes(state)
                 if not outcomes:
                     break
-                action = rng.choices(
-                    [key for key, _ in outcomes],
-                    weights=[prob for _, prob in outcomes],
-                    k=1,
-                )[0]
+                action = sample_chance_outcome(outcomes, rng)
             else:
                 legal = model.get_legal_actions(state)
                 if not legal:
@@ -432,11 +426,7 @@ class ModelTest:
                 outcomes = model.chance_outcomes(state)
                 if not outcomes:
                     break
-                action = rng.choices(
-                    [key for key, _ in outcomes],
-                    weights=[prob for _, prob in outcomes],
-                    k=1,
-                )[0]
+                action = sample_chance_outcome(outcomes, rng)
             else:
                 legal = model.get_legal_actions(state)
                 if not legal:

@@ -40,6 +40,11 @@ from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig
 
 ANGLE = "launch_theater"
 
+POLICY_RNG = random.Random(13)
+"""Seeded so the walkthrough prints the same numbers on every run -- the
+README quotes them verbatim. The global ``random`` here would reseed from OS
+entropy each run and drift the settled/partial counts."""
+
 
 def banner(number: int, title: str) -> None:
     print()
@@ -53,7 +58,7 @@ def random_policy(model: ReferenceWorldModel, state: object) -> str:
     planning, so even this dumb policy never proposes an illegal move --
     that is the point of section 7."""
     legal = model.get_legal_actions(state)  # type: ignore[attr-defined]
-    return random.choice(legal)
+    return POLICY_RNG.choice(legal)
 
 
 # ---------------------------------------------------------------------------

@@ -66,7 +66,6 @@ packages = ["src/blotto"]
 testpaths = ["tests"]
 markers = [
     "unit: fast pure-function tests, no subprocess and no network",
-    "integration: exercises the synthesis loop against recorded fixtures",
     "e2e: drives the whole loop across module boundaries and asserts on outcomes; offline, no credentials",
     "live: requires real API credentials; deselected by default",
 ]
@@ -99,5 +98,5 @@ disallow_untyped_defs = true
 # no extras installed has stubs for them; ignoring the missing import keeps the
 # import lazy while still checking everything on our side of the call.
 [[tool.mypy.overrides]]
-module = ["anthropic", "anthropic.*", "openai", "openai.*", "composio", "composio.*"]
+module = ["anthropic", "anthropic.*", "openai", "openai.*", "composio", "composio.*", "tomli"]
 ignore_missing_imports = true

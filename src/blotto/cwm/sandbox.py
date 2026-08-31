@@ -513,6 +513,12 @@ def instantiate(namespace: types.ModuleType, class_name: str) -> CodeWorldModel:
 # ---------------------------------------------------------------------------
 
 
+_CHILD_STARTUP_GRACE_SECONDS = 10.0
+"""Extra budget the load request gets on top of ``timeout_seconds``: it pays
+for spawning a fresh interpreter, which varies by machine and has nothing to
+do with the untrusted code's own running time."""
+
+
 _WORKER = r'''
 """Child half of SubprocessSandbox. Stdlib only; never imports blotto.
 
@@ -803,7 +809,11 @@ class SubprocessSandbox:
                 "op": "load",
                 "source": source,
                 "max_output_bytes": config.max_output_bytes,
-            }
+            },
+            # Interpreter startup is environment cost, not model code: on a
+            # cold Windows box it alone can exceed a sub-second call budget.
+            # The kill guarantee stands -- the load budget is larger, not gone.
+            timeout=config.timeout_seconds + _CHILD_STARTUP_GRACE_SECONDS,
         )
         if not reply.get("ok"):
             self.close()

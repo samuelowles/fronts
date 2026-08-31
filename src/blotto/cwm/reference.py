@@ -27,7 +27,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
-from blotto.game.action_space import ActionCodec, enumerate_publishes, utm_content_id
+from blotto.game.action_space import ActionCodec, enumerate_publishes, restamp_unique
 from blotto.game.legality import (
     ACQUISITION_CTAS,
     AllocationChange,
@@ -72,6 +72,7 @@ from blotto.game.types import (
     State,
     Step,
     Trajectory,
+    sample_chance_outcome,
 )
 from blotto.protocols import CodeWorldModel
 
@@ -765,12 +766,7 @@ class ReferenceWorldModel:
         while self.get_current_player(state) != TERMINAL_PLAYER and len(moves) < steps:
             player = self.get_current_player(state)
             if player == CHANCE_PLAYER:
-                outcomes = self.chance_outcomes(state)
-                action = rng.choices(
-                    [key for key, _ in outcomes],
-                    weights=[prob for _, prob in outcomes],
-                    k=1,
-                )[0]
+                action = sample_chance_outcome(self.chance_outcomes(state), rng)
                 # Recorded, not discarded. A transition is deterministic given
                 # the chance action, so a test that re-draws is measuring the
                 # dice rather than the model. See Trajectory.chance.
@@ -788,16 +784,8 @@ class ReferenceWorldModel:
                 )
             move = self.codec.decode(action)
             if isinstance(move, Publish):
-                # Re-stamp with a per-step unique id. The legal-action set
-                # offers a fixed catalogue, so a policy that picks the same
-                # entry twice would publish two distinct posts under one utm --
-                # and utm is the join key between a move and its observation.
-                # The two posts then collapse to one row, the later metrics
-                # overwrite the earlier, and a transition test compares a
-                # model's prediction for post A against the numbers post B
-                # eventually produced. That looked like a 3x modelling error
-                # and was a bookkeeping collision.
-                move = replace(move, utm_content=utm_content_id(move, salt=str(len(moves))))
+                # ``restamp_unique`` explains the utm collision this prevents.
+                move = restamp_unique(move, len(moves))
                 action = self.codec.encode(move)
             moves.append(move)
             state = self.apply_action(state, action)

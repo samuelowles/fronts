@@ -28,6 +28,8 @@ disagree, and often should.
 
 from __future__ import annotations
 
+import random
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, NewType
@@ -61,6 +63,7 @@ __all__ = [
     "Trajectory",
     "Step",
     "EvidenceGate",
+    "sample_chance_outcome",
 ]
 
 
@@ -89,6 +92,20 @@ less that angle pays."""
 
 State = NewType("State", dict[str, Any])
 """Opaque world-model state. Schema is the synthesised model's business."""
+
+
+def sample_chance_outcome(
+    outcomes: Sequence[tuple[ActionKey, float]], rng: random.Random
+) -> ActionKey:
+    """One weighted draw from a chance node's ``(outcome, probability)`` pairs.
+
+    Every replay and rollout path draws chance identically; keeping the
+    idiom here once is what stops one of the copies drifting."""
+    return rng.choices(
+        [key for key, _ in outcomes],
+        weights=[probability for _, probability in outcomes],
+        k=1,
+    )[0]
 
 ActionKey = NewType("ActionKey", str)
 """Stable string encoding of a Move.
@@ -259,8 +276,6 @@ class Publish:
     """Tracking id. This is the join key between a move and its observation, and
     the reason an untracked post is not a legal move."""
 
-    kind: MoveKind = MoveKind.PUBLISH
-
 
 @dataclass(frozen=True, slots=True)
 class Scale:
@@ -271,8 +286,6 @@ class Scale:
     """Multiplier on current allocation. Velocity limits are enforced in
     ``blotto.game.legality``, not here."""
 
-    kind: MoveKind = MoveKind.SCALE
-
 
 @dataclass(frozen=True, slots=True)
 class Kill:
@@ -280,7 +293,6 @@ class Kill:
 
     angle: str
     reason: str
-    kind: MoveKind = MoveKind.KILL
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,8 +303,6 @@ class Hold:
     substantiated claim is better off silent than shipping generic slop at
     $3.50 CPC. The planner must be able to represent that.
     """
-
-    kind: MoveKind = MoveKind.HOLD
 
 
 Move = Publish | Scale | Kill | Hold

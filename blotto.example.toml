@@ -27,6 +27,7 @@ fixed_cost_per_post = 50.0   # what one published item costs you to produce
 # src/blotto/game/legality.py; change them when your risk tolerance differs,
 # not to make a refused move pass.
 creative_judgement_min_conversions = 50   # settled conversions / 7d to call a winner
+creative_judgement_window_days     = 7    # the trailing window those settle in
 spend_commitment_min_conversions   = 300  # settled conversions / variant over 14d
 spend_commitment_min_days          = 14
 spend_commitment_factor            = 1.20 # Scale factor that counts as budget

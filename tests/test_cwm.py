@@ -966,6 +966,19 @@ def test_report_formats_train_test_and_online() -> None:
     assert (report.passed_tests, report.total_tests) == (39, 52)
 
 
+def test_report_renders_unmeasured_inference_as_na() -> None:
+    """The default is None -- not measured -- and the table must say so
+    rather than manufacture a number (``blotto accuracy`` relies on this)."""
+    report = ModelQualityReport(
+        transition_accuracy_train=0.9,
+        transition_accuracy_test=0.8,
+        transition_accuracy_online=0.7,
+    )
+    table = report.format_table()
+    assert table.count("n/a") == 3
+    assert report.inference_accuracy is None
+
+
 def _random_policy(model: object, state: object) -> str:
     legal = model.get_legal_actions(state)  # type: ignore[attr-defined]
     return random.Random(len(str(state))).choice(legal) if legal else "hold"

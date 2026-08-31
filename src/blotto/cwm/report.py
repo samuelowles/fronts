@@ -44,9 +44,13 @@ class ModelQualityReport:
     transition_accuracy_train: float = 0.0
     transition_accuracy_test: float = 0.0
     transition_accuracy_online: float = 0.0
-    inference_accuracy_train: float = 0.0
-    inference_accuracy_test: float = 0.0
-    inference_accuracy_online: float = 0.0
+    # None means NOT MEASURED, rendered as "n/a". Scoring inference needs a
+    # sampler to score (see ``blotto.cwm.inference.inference_accuracy``);
+    # copying the transition numbers into these columns would manufacture a
+    # measurement that never happened.
+    inference_accuracy_train: float | None = None
+    inference_accuracy_test: float | None = None
+    inference_accuracy_online: float | None = None
     llm_calls: int = 0
     passed_tests: int = 0
     total_tests: int = 0
@@ -56,7 +60,7 @@ class ModelQualityReport:
         return self.transition_accuracy_test
 
     @property
-    def inference_accuracy(self) -> float:
+    def inference_accuracy(self) -> float | None:
         return self.inference_accuracy_test
 
     def format_table(self) -> str:
@@ -65,14 +69,17 @@ class ModelQualityReport:
         Accuracy as a two-decimal fraction, one row per split, so the train
         and test columns sit next to each other and the gap between them is
         the first thing the eye finds."""
+        def cell(value: float | None) -> str:
+            return f"{value:>12.2f}" if value is not None else f"{'n/a':>12}"
+
         header = f"{'split':<8} {'transition':>12} {'inference':>12}"
         rows = [
             f"{TRAIN:<8} {self.transition_accuracy_train:>12.2f} "
-            f"{self.inference_accuracy_train:>12.2f}",
+            f"{cell(self.inference_accuracy_train)}",
             f"{TEST:<8} {self.transition_accuracy_test:>12.2f} "
-            f"{self.inference_accuracy_test:>12.2f}",
+            f"{cell(self.inference_accuracy_test)}",
             f"{ONLINE:<8} {self.transition_accuracy_online:>12.2f} "
-            f"{self.inference_accuracy_online:>12.2f}",
+            f"{cell(self.inference_accuracy_online)}",
         ]
         footer = (
             f"tests: {self.passed_tests}/{self.total_tests} passed, "

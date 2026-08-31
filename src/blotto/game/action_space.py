@@ -29,7 +29,7 @@ from __future__ import annotations
 import hashlib
 import random
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TypeVar
 
@@ -57,6 +57,7 @@ __all__ = [
     "AngleRegistry",
     "enumerate_publishes",
     "utm_content_id",
+    "restamp_unique",
 ]
 
 
@@ -327,6 +328,20 @@ def utm_content_id(move: Move, salt: str) -> str:
     return digest[:8]
 
 
+def restamp_unique(move: Publish, index: int) -> Publish:
+    """Re-stamp a catalogue ``Publish`` with a per-step unique utm.
+
+    The legal-action set is a fixed catalogue, so a policy that picks the
+    same entry twice publishes two distinct posts under one utm -- and utm
+    is the join key between a move and its observation. The posts then
+    collapse to one row, later metrics overwrite earlier ones, and a
+    transition test compares post A's prediction against post B's numbers.
+    That read as a 3x modelling error and was a bookkeeping collision;
+    every episode recorder calls this before appending a Publish.
+    """
+    return replace(move, utm_content=utm_content_id(move, salt=str(index)))
+
+
 def enumerate_publishes(
     *,
     platforms: Iterable[Platform],
@@ -425,19 +440,7 @@ def enumerate_publishes(
             angle=angle,
             utm_content="",
         )
-        return Publish(
-            platform=stub.platform,
-            format=stub.format,
-            archetype=stub.archetype,
-            vector=stub.vector,
-            semantic_tier=stub.semantic_tier,
-            hook=stub.hook,
-            avatar=stub.avatar,
-            cta_mode=stub.cta_mode,
-            claim_class=stub.claim_class,
-            angle=stub.angle,
-            utm_content=utm_content_id(stub, salt),
-        )
+        return replace(stub, utm_content=utm_content_id(stub, salt))
 
     if total <= limit:
         for index in range(total):

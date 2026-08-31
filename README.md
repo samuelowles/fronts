@@ -158,7 +158,7 @@ dependencies.
 ```bash
 git clone https://github.com/owles-works/blotto && cd blotto
 pip install -e .                       # core: zero dependencies
-python examples/walkthrough.py         # the whole loop, ~6s, no keys needed
+python examples/walkthrough.py         # the whole loop, seconds, no keys needed
 ```
 
 Add providers only when you want a real synthesis run:
@@ -177,7 +177,8 @@ tell you anything is a repository nobody evaluates.
 ## See it run
 
 No keys, no network, no setup. `examples/walkthrough.py` drives the whole loop
-against a reference model in about six seconds. Three excerpts, verbatim.
+against a reference model in under half a minute, deterministically — the same
+numbers on every run. Three excerpts, verbatim.
 
 **The instrument reads zero on a known-zero input.** Tests generated from a
 model's own history, run back against it:
@@ -185,8 +186,8 @@ model's own history, run back against it:
 ```
 3. The ground-truth test: pass rate must be exactly 1.00
 ==============================================================================
-  tests generated from history: 240
-  passed against the model that wrote it: 240
+  tests generated from history: 243
+  passed against the model that wrote it: 243
   pass rate: 1.00
 
   1.00, exactly. Tolerances are the tightened ones (counts 0.05,
@@ -199,9 +200,9 @@ model's own history, run back against it:
 
 ```
   action                                                         visits         value
-  publish|tiktok|carousel|founder_trauma|aspiration_status|triba    125     1,749,213
-  publish|tiktok|carousel|anti_hero_rant|aspiration_status|triba      2       650,303
-  hold                                                                1       246,219
+  publish|tiktok|text_thread|founder_trauma|aspiration_status|tr    125       311,143
+  publish|tiktok|carousel|founder_trauma|aspiration_status|triba      2       173,277
+  hold                                                                1        70,513
 ```
 
 **A refusal you can audit.** Not a warning, not a penalty — the move is absent
@@ -212,9 +213,8 @@ from the legal set:
   ----------------------------------------------------------------------------
   REFUSED
     rule:   CREATIVE_JUDGEMENT
-    reason: angle 'launch_theater' has 12 settled conversions in the trailing 7d;
-            declaring a winner requires 50
-    source: Storytelling Engineer/17_A_B_Testing_Story_Arcs...md
+    reason: angle 'launch_theater' has 12 settled conversions in the trailing 7d; declaring a winner requires 50
+    source: Storytelling Engineer/17_A_B_Testing_Story_Arcs_Statistical_Significance_in_Emotion.md
   ----------------------------------------------------------------------------
 
   And peeking does not help: 100 conversions inside the reporting
@@ -263,6 +263,12 @@ your last month is not going to predict your next one.
 solution concept for how well it is actually justified. The signalling module in
 particular is an analogy resting on assumptions that do not cleanly hold, and
 says so in its own docstring.
+
+Two more gaps, stated plainly. The shipped `blotto plan` determinizes
+uniformly — the closed-deck state-inference sampler (`cwm/inference`) is
+exercised by the test suite and available through the API, but not yet wired
+into the CLI. And `blotto accuracy` reports the inference column as `n/a`
+rather than inventing a number for it, for the same reason.
 
 ---
 

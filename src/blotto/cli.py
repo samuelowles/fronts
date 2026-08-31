@@ -30,7 +30,7 @@ import os
 import random
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -60,7 +60,7 @@ from blotto.cwm.tests_from_traj import (
     generate,
     split,
 )
-from blotto.game.action_space import ActionCodec, ActionDecodeError, utm_content_id
+from blotto.game.action_space import ActionCodec, ActionDecodeError, restamp_unique
 from blotto.game.legality import LegalityContext, LegalityEngine
 from blotto.game.types import (
     CHANCE_PLAYER,
@@ -74,6 +74,7 @@ from blotto.game.types import (
     State,
     Step,
     Trajectory,
+    sample_chance_outcome,
 )
 from blotto.protocols import CodeWorldModel
 from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig
@@ -214,12 +215,7 @@ def _load_model_source(path: Path) -> CodeWorldModel:
 
 
 def _sample_chance(model: CodeWorldModel, state: State, rng: random.Random) -> ActionKey:
-    outcomes = model.chance_outcomes(state)
-    return rng.choices(
-        [key for key, _ in outcomes],
-        weights=[probability for _, probability in outcomes],
-        k=1,
-    )[0]
+    return sample_chance_outcome(model.chance_outcomes(state), rng)
 
 
 def _play_trajectory(
@@ -257,17 +253,10 @@ def _play_trajectory(
         action = rng.choice(legal)
         move = _CODEC.decode(action)
         if isinstance(move, Publish):
-            # Re-stamp with a per-step unique id, exactly as
-            # ``ReferenceWorldModel.generate_trajectory`` does: the legal set
-            # is a fixed catalogue, so a random re-pick publishes two distinct
-            # posts under one utm -- and utm is the join key between a move
-            # and its observation. Without this the online split of
-            # ``accuracy`` scored the REFERENCE model below 1.0, charging it
-            # for a bookkeeping collision (see the re-stamp in
-            # ``generate_trajectory`` for the full failure mode).
-            move = replace(
-                move, utm_content=utm_content_id(move, salt=str(len(moves)))
-            )
+            # Without this the online split of ``accuracy`` scored the
+            # REFERENCE model below 1.0 -- ``restamp_unique`` explains the
+            # collision it prevents.
+            move = restamp_unique(move, len(moves))
             action = _CODEC.encode(move)
         moves.append(move)
         state = model.apply_action(state, action)
@@ -518,13 +507,13 @@ def _cmd_accuracy(args: argparse.Namespace) -> int:
     online_tests = generate(online_trajectory, Tolerance(), include_hidden=False)
     online_rate, online_passed, online_total = pass_rate(online_tests)
 
+    # The inference columns stay at their None default: this command has no
+    # synthesised sampler to score, and a column that mirrored the transition
+    # numbers would be a measurement that never happened.
     report = ModelQualityReport(
         transition_accuracy_train=train_rate,
         transition_accuracy_test=test_rate,
         transition_accuracy_online=online_rate,
-        inference_accuracy_train=train_rate,
-        inference_accuracy_test=test_rate,
-        inference_accuracy_online=online_rate,
         llm_calls=0,
         passed_tests=train_passed + test_passed,
         total_tests=train_total + test_total,
@@ -534,7 +523,8 @@ def _cmd_accuracy(args: argparse.Namespace) -> int:
     print(
         "note: splits are pass rates on closed-deck "
         f"{OBSERVATION_RECONSTRUCTION} tests; the online split is self-play "
-        "consistency, not the paper's live protocol."
+        "consistency, not the paper's live protocol. inference is n/a until "
+        "a sampler is synthesised and scored (blotto.cwm.inference)."
     )
     return EXIT_OK
 

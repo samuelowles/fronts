@@ -33,6 +33,7 @@ from blotto.game.types import (
     TERMINAL_PLAYER,
     ActionKey,
     State,
+    sample_chance_outcome,
 )
 from blotto.protocols import CodeWorldModel
 
@@ -97,11 +98,7 @@ def play_episode(
             outcomes = model.chance_outcomes(state)
             if not outcomes:
                 break
-            action = rng.choices(
-                [key for key, _ in outcomes],
-                weights=[prob for _, prob in outcomes],
-                k=1,
-            )[0]
+            action = sample_chance_outcome(outcomes, rng)
         else:
             legal = model.get_legal_actions(state)
             if not legal:

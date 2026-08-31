@@ -70,6 +70,12 @@ def default_api_spec() -> str:
     """
     lines: list[str] = []
     for name, method in inspect.getmembers(CodeWorldModel, predicate=inspect.isfunction):
+        # Protocol classes grow version-dependent machinery (3.11 exposes
+        # __subclasshook__ as a plain function; 3.13 does not). The spec must
+        # list the API and nothing else, and it must hash identically on every
+        # supported Python, because fixture keys are hashes of this prompt.
+        if name.startswith("_"):
+            continue
         signature = str(inspect.signature(method))
         doc = inspect.getdoc(method) or ""
         first_line = doc.splitlines()[0] if doc else ""
