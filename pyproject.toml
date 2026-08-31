@@ -67,9 +67,8 @@ testpaths = ["tests"]
 markers = [
     "unit: fast pure-function tests, no subprocess and no network",
     "e2e: drives the whole loop across module boundaries and asserts on outcomes; offline, no credentials",
-    "live: requires real API credentials; deselected by default",
 ]
-addopts = "-m 'not live' --timeout=60"
+addopts = "--timeout=60"
 
 [tool.ruff]
 line-length = 100

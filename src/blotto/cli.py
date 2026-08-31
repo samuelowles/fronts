@@ -433,6 +433,14 @@ def _cmd_synth(args: argparse.Namespace) -> int:
     history_path = Path(args.history) if args.history else config.paths.history
     rules_path = Path(args.rules) if args.rules else config.paths.rules
     out_path = Path(args.out) if args.out else config.paths.model
+    if _inference_path(out_path) == out_path:
+        print(
+            "--out must not be named inference.py: that name is reserved for "
+            "the sampler written beside the model, and the sampler would "
+            "silently overwrite it",
+            file=sys.stderr,
+        )
+        return EXIT_ERROR
 
     trajectory = TrajectoryStore(history_path).settled_only()
     if not trajectory.steps:
@@ -487,6 +495,11 @@ def _cmd_synth(args: argparse.Namespace) -> int:
     inference_path = _inference_path(out_path)
     if inference_source is not None:
         inference_path.write_text(inference_source, encoding="utf-8")
+    else:
+        # A sampler from a PREVIOUS synth must not survive a failed one:
+        # `plan` would silently pair the new model with the old model's
+        # sampler, and the open-loop message below would be a lie.
+        inference_path.unlink(missing_ok=True)
 
     print(f"synthesised model written to {out_path}")
     print(f"  candidates:   {len(tree.nodes)}")

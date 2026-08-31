@@ -217,8 +217,9 @@ as inexplicably poor results.
 Reading the paper closely turns up two internal inconsistencies worth flagging:
 
 1. The §5.1.2 prose gives Gin rummy accuracy as 84% train / 79% test. Table 1
-   gives 0.7816 / 0.7455. The prose figures match Table 6, which is hidden-state
-   inference, not the table being discussed.
+   gives 0.7816 / 0.7455. The prose figures match neither Table 1 nor the
+   hidden-state inference numbers in Table 6 (1.0000 / 0.9513); where they
+   came from is not identifiable from the paper.
 2. §5.2.1 claims CWM-MCTS and ground-truth MCTS are at parity, "without either
    of them clearly winning in any of the games." Table 7's Backgammon row shows
    0.08 win / 0.92 loss and 0.07 / 0.93. That is not parity.

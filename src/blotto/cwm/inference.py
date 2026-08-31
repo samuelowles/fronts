@@ -34,12 +34,15 @@ from __future__ import annotations
 import random
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import cast
 
 from blotto.cwm.llm import LLMClient, extract_code
 from blotto.cwm.sandbox import (
     Sandbox,
     SandboxConfig,
+    call_with_timeout,
     check_protocol_methods,
+    guard_methods,
 )
 from blotto.cwm.synth import SynthConfig
 from blotto.cwm.tests_from_traj import Tolerance, _draw_recorded_chance
@@ -171,7 +174,11 @@ def _verified_instance(
         cls = getattr(namespace, class_name, None)
         if cls is None:
             return None
-        instance: object = cls()
+        # The constructor is untrusted code too: a spinning __init__ would
+        # hang the caller before any method guard could apply.
+        instance: object = call_with_timeout(
+            cls, (), SandboxConfig().timeout_seconds
+        )
         if check_protocol_methods(instance, methods, class_name):
             return None
         return instance
@@ -256,18 +263,30 @@ def synthesise_state_inference_source(
     return loaded[1]
 
 
-def load_state_inference(source: str) -> StateInference | None:
+def load_state_inference(
+    source: str, timeout_seconds: float | None = None
+) -> StateInference | None:
     """Sandbox-load a persisted ``resample_state`` sampler.
 
     None when the source does not load or does not satisfy the protocol; the
     caller chooses its own degradation. ``blotto plan`` degrades to open-loop
     search against the true state -- NOT ``FallbackInference``, whose
     initial-state resample would silently discard the episode's progress.
+
+    The returned sampler's ``resample_state`` is wrapped in the in-process
+    timeout guard: the source came off disk and is untrusted, and a spinning
+    sampler must cost the planner one skipped determinization (it catches the
+    ``SandboxTimeout``), never the whole run.
     """
+    budget = (
+        SandboxConfig().timeout_seconds if timeout_seconds is None else timeout_seconds
+    )
     instance = _verified_instance(source, STATE_INFERENCE_CLASS, _STATE_METHODS)
     if instance is None or not isinstance(instance, StateInference):
         return None
-    return instance
+    return cast(
+        StateInference, guard_methods(instance, ("resample_state",), budget)
+    )
 
 
 def synthesise_history_inference(
@@ -410,14 +429,20 @@ def inference_accuracy(
             recorded = step.observation
             if recorded is not None and not recorded.is_partial:
                 total += 1
-                if mode == "history":
-                    sampled = inference.resample_history(history, OPERATOR)  # type: ignore[union-attr]
-                    ok = validate_history(
-                        model, sampled, [recorded], trajectory.chance
-                    )
-                else:
-                    state = inference.resample_state(history, OPERATOR)  # type: ignore[union-attr]
-                    ok = _reproduces(model, state, recorded, tol)
+                try:
+                    if mode == "history":
+                        sampled = inference.resample_history(history, OPERATOR)  # type: ignore[union-attr]
+                        ok = validate_history(
+                            model, sampled, [recorded], trajectory.chance
+                        )
+                    else:
+                        state = inference.resample_state(history, OPERATOR)  # type: ignore[union-attr]
+                        ok = _reproduces(model, state, recorded, tol)
+                except Exception:
+                    # A sampler that cannot be asked has missed. The module
+                    # contract is fall back, never propagate: a raising
+                    # sampler must read as a bad score, not a stack trace.
+                    ok = False
                 matched += 1 if ok else 0
             history.append((recorded, action))
     return matched / total if total else 0.0

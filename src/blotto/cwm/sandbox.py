@@ -322,10 +322,14 @@ class Sandbox:
         """Wrap ``model`` so every ``CodeWorldModel`` method call runs under
         ``call_with_timeout``.
 
-        The load-time timeout only covers module top-level code. A hang
-        inside ``apply_action`` during a 1000-simulation search would wedge
-        the planner forever; wrapping each call means the planner gets a
-        ``SandboxTimeout`` and can give up on the candidate.
+        The load-time timeout only covers module top-level code; a hang
+        inside ``apply_action`` wedges whoever called it. Wrapping converts
+        that hang into a ``SandboxTimeout`` the caller can act on -- at the
+        price of one worker thread PER CALL, which is why the shipped
+        planning loop does NOT use it: ISMCTS makes ~10^5 model calls per
+        plan, and a thread each would dominate the runtime. Wrap when call
+        volume is low or trust is lower still; for genuinely hostile source,
+        ``SubprocessSandbox`` is the wall (SECURITY.md).
         """
         return guard_methods(model, CWM_METHOD_PARAMS, timeout)  # type: ignore[return-value]
 

@@ -1124,6 +1124,49 @@ def test_inference_accuracy_rejects_an_unknown_mode() -> None:
         inference_accuracy(model, FallbackInference(model=model), [], mode="sniff")
 
 
+def test_inference_accuracy_counts_a_raising_sampler_as_misses() -> None:
+    """The module contract is fall back, never propagate: a sampler that
+    cannot be asked reads as a bad score, not a stack trace out of
+    ``blotto accuracy``."""
+
+    class Hostile:
+        def resample_state(self, history: list, player_id: int) -> dict:
+            raise RuntimeError("boom")
+
+        def resample_history(self, history: list, player_id: int) -> list:
+            raise RuntimeError("boom")
+
+    config = ReferenceConfig(horizon=8, seed=2)
+    model = ReferenceWorldModel(config)
+    trajectory = model.generate_trajectory(_random_policy, 8, random.Random(2))
+    assert inference_accuracy(model, Hostile(), [trajectory], mode="state") == 0.0
+    assert inference_accuracy(model, Hostile(), [trajectory], mode="history") == 0.0
+
+
+def test_load_state_inference_guards_the_sampler(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The persisted sampler came off disk and is untrusted: the loader must
+    wrap ``resample_state`` in the timeout guard, so a spinning sampler costs
+    the planner one skipped determinization, never the whole run."""
+    import blotto.cwm.inference as inference_module
+
+    seen: dict[str, object] = {}
+    real_guard = inference_module.guard_methods
+
+    def spy(obj: object, names: object, timeout: float) -> object:
+        seen["names"] = tuple(names)  # type: ignore[arg-type]
+        seen["timeout"] = timeout
+        return real_guard(obj, names, timeout)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(inference_module, "guard_methods", spy)
+    sampler = load_state_inference(INFERENCE_SOURCE, timeout_seconds=2.0)
+    assert sampler is not None
+    assert seen == {"names": ("resample_state",), "timeout": 2.0}
+    # The guard forwards a healthy call unchanged.
+    assert sampler.resample_state([], 0)["theta"]["hook_rate"] == 1.1
+
+
 @pytest.mark.parametrize("horizon", [6, 10, 11, 20, 21])
 def test_validate_history_accepts_a_model_validating_itself(horizon: int) -> None:
     """Horizon-independent, which it was not.

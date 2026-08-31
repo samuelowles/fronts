@@ -867,6 +867,19 @@ def test_accuracy_scores_the_sampler_when_one_is_persisted(
         "train and online carry measurements; only the test split stays n/a"
     )
 
+    # A sampler that raises on every call must read as a bad score, never a
+    # stack trace -- this crashed with a traceback before the exception was
+    # counted as a miss inside inference_accuracy.
+    (tmp_path / "inference.py").write_text(
+        "class StateInferenceSampler:\n"
+        "    def resample_state(self, obs_action_history, player_id):\n"
+        "        return 1 // 0\n",
+        encoding="utf-8",
+    )
+    assert app(["accuracy", "--config", str(config), "--seed", "3"]) == 0
+    hostile = capsys.readouterr().out
+    assert "0.00" in hostile, "the hostile sampler scores zero, visibly"
+
 
 # ---------------------------------------------------------------------------
 # Scenario 8: the whole loop with the network physically unavailable.

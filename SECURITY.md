@@ -72,6 +72,16 @@ CPython cannot forcibly kill a thread, so `call_with_timeout` protects the
 *caller's control flow*, not the process: a synthesised module that spins will
 leak a thread even though the timeout fires correctly.
 
+Know also what the shipped CLI does and does not wrap. The per-call guard
+(`Sandbox.guarded`) costs one worker thread per call, so the planning loop —
+which makes on the order of 10^5 model calls per plan — runs the loaded world
+model *unguarded* in-process; a model whose method body loops forever will
+hang `blotto plan` until you kill it. The persisted inference sampler IS
+guarded (one call per determinization is cheap), and the AST gate below runs
+on everything before it executes. If a hang from hostile source is in your
+threat model, that is `SubprocessSandbox` territory, not a reason to thread
+the inner loop.
+
 If you are running synthesis output you have any reason to distrust — a shared
 rules file, an untrusted provider, a multi-tenant deployment — use
 `SubprocessSandbox`, which executes in a separate process and can actually kill

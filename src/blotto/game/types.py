@@ -98,8 +98,10 @@ def sample_chance_outcome(
 ) -> ActionKey:
     """One weighted draw from a chance node's ``(outcome, probability)`` pairs.
 
-    Every replay and rollout path draws chance identically; keeping the
-    idiom here once is what stops one of the copies drifting."""
+    Every replay and rollout path outside ``solvers/`` draws chance through
+    this one helper, which is what stops copies drifting. ``solvers.ismcts``
+    keeps its own validating inverse-CDF draw on purpose: a solver ships
+    standalone and must reject malformed probabilities at its own boundary."""
     return rng.choices(
         [key for key, _ in outcomes],
         weights=[probability for _, probability in outcomes],
