@@ -698,7 +698,7 @@ def _cmd_arena(args: argparse.Namespace) -> int:
         ("first-publish", first_publish_agent),
         ("hold", hold_agent),
     ]
-    result = arena_run([model for model in hosts], [agent for _, agent in agents],
+    result = arena_run(hosts, [agent for _, agent in agents],
                        ArenaConfig(matches_per_pairing=3))
     names = [name for name, _ in agents]
     print("arena: strategies play inside the host model(s); losers are rejected")
