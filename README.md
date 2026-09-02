@@ -1,8 +1,8 @@
 <h1 align="center">fronts</h1>
 
 <p align="center">
-  <strong>Plan content distribution as an imperfect-information game â€”<br>
-  inside a world model a language model wrote for you.</strong>
+  <strong>Plan content distribution as an imperfect-information game,<br>
+  inside a world model a language model wrote from your posting history.</strong>
 </p>
 
 <p align="center">
@@ -13,118 +13,100 @@
   <a href="https://arxiv.org/abs/2510.04542"><img alt="arXiv 2510.04542" src="https://img.shields.io/badge/arXiv-2510.04542-b31b1b.svg"></a>
 </p>
 
-Most AI distribution tooling asks a model to *be* a marketer: here is my
-product, write me ten hooks. `fronts` asks it to do something narrower and far
-more useful â€” read your posting history and **write the simulator**. Then it
-plans inside that simulator with Information Set MCTS, the same way an engine
-plays poker.
+Most AI marketing tools ask a language model to write your content. `fronts`
+gives it a narrower job: read your posting history and write a simulator of
+your distribution environment. Planning then happens inside that simulator
+with Information Set MCTS, the same family of search that plays poker. The
+language model is never called while a plan is being computed.
 
-Based on [*Code World Models for General Game Playing*](https://arxiv.org/abs/2510.04542)
-(Lehrach et al., Google DeepMind, 2025), applied to a domain the paper does not
-discuss.
-
----
-
-## The argument in three paragraphs
-
-**Asking a language model for content is asking it to be a policy.** The paper's
-objection is that this "relies on the model's implicit fragile pattern-matching
-capabilities, leading to frequent illegal moves and strategically shallow play."
-In board games an illegal move forfeits. In distribution it is an
-unsubstantiated FTC claim, an undisclosed AI face on TikTok, or a budget
-committed on five conversions of evidence. Shallow play is posting today with no
-model of what today does to tomorrow's reach.
-
-**So change the model's job.** Give it your platform policies in prose and your
-last few dozen posts with the metrics that came back, and have it emit a Python
-simulator of your distribution environment: a transition function, a legal-action
-function, an observation function with real attribution loss in it, and a reward
-function denominated in paying users. Then never call the language model again
-during planning. Search does the playing, and search converts compute into
-strength in a way prompting does not.
-
-**And take the game theory seriously, because the paper doesn't.** It uses
-extensive-form games purely as planning scaffolding â€” no equilibria, no
-mechanism design, no signalling. But distribution genuinely is strategic: your
-daily output is a fixed force allocated across contested fronts (Colonel
-Blotto), angles decay in value as rivals crowd them (congestion games), the
-ranking algorithm drifts adversarially (EXP3, not UCB), it commits before you
-move and never tells you what to (Stackelberg), and a claim is believable only
-when it is expensive to fake (Spence). Those five solvers are ours.
+The method comes from [*Code World Models for General Game
+Playing*](https://arxiv.org/abs/2510.04542) (Lehrach et al., Google DeepMind,
+2025). This repository applies it to a domain the paper does not cover.
 
 ---
 
-## What makes it different
+## Why
 
-**The reward is paying users.** Reach does not appear in the objective function
-at all. It appears in the *observation*, because a hook rate below 25% tells you
-the platform stopped serving your asset â€” but never in the reward. The corpus
-this is built from records the reason: the cheapest acquisition vector
-($30 CAC) produced 45% three-month churn and $250 LTV, while the most expensive
-($65 CAC) produced 8% churn and $1,200 LTV. **Anything minimising CAC picks the
-wrong one, and gets more confident with more data.**
+Used as a policy, a language model picks moves by pattern-matching, and the
+paper is blunt about how that goes: "frequent illegal moves and strategically
+shallow play." In a board game an illegal move loses the game. In distribution
+it is an unsubstantiated FTC claim, an undisclosed AI face on TikTok, or budget
+committed on five conversions of evidence.
 
-**Scaling too early is impossible, not discouraged.** `Scale` is a first-class
-move with an evidence gate in front of it: 50 settled conversions in a trailing
-7-day window before an angle may be called a winner, 300 conversions and 14 days
-before budget follows. Observations inside the 24â€“72 hour reporting lag count
-for zero. This is a *gate*, not a penalty â€” the planner cannot select the move
-at any confidence, because it never appears in the legal action set.
+So the model gets a different job. You hand it your platform policies in prose
+and a few dozen posts with the metrics that came back. It writes a Python
+simulator: a transition function, a legal-action function, an observation
+function that models real attribution loss, and a reward measured in paying
+users. After that, search does the playing.
 
-**Data you mostly cannot see makes an angle unjudgeable, not noisy.** Below the
-attribution-coverage floor, `Scale` and `Kill` are *both* illegal. You may not
-conclude an angle is winning and you may not conclude it is losing. This is the
-least intuitive rule in the system and the one operators most reliably get wrong
-in the confident direction.
+Distribution is also a real game, and the repository treats it as one. Your
+daily output is a fixed force spread across contested fronts (Colonel Blotto).
+Angles lose value as rivals crowd them (congestion games). The ranking
+algorithm drifts (EXP3 rather than UCB). The platform commits before you move
+(Stackelberg). A claim persuades only when it is expensive to fake (Spence).
+All five solvers ship with the repository and run with no model at all.
 
-**Every number carries a citation â€” and the citations are unverifiable, which
-you should know.** `game/priors.py` holds the empirical bands, each with a
-`source` field naming the file it came from, and a prior without one cannot
-exist â€” the self-check enforces that programmatically. But those files are two
-private operator corpora. You cannot open them. So the citations buy provenance,
-not independent verification, and these are one operator's measurements in their
-verticals at a point in time, not constants.
+## The rules that matter
 
-Treat them as a **starting prior** and replace them with your own once you have
-settled history. The mechanism in this repository is verifiable from the
-repository; the priors are not. Judge them separately.
+The reward is paying users, not reach. Reach shows up in the observation
+because a hook rate under 25% means the platform stopped serving your asset,
+but it never enters the reward. The corpus behind the priors records why this
+matters: a $30-CAC channel produced 45% three-month churn at $250 LTV, while a
+$65-CAC channel produced 8% churn at $1,200 LTV. A system built to minimise
+CAC picks the wrong channel and grows more confident as the data piles up.
+
+Premature scaling is illegal rather than penalised. Calling an angle a winner
+takes 50 settled conversions in a trailing 7-day window. Moving budget takes
+300 conversions over 14 days. Anything still inside the 24-72 hour reporting
+lag counts for zero. The planner cannot pick a gated move at any level of
+confidence, because the move never enters the legal action set.
+
+Low attribution coverage makes an angle unjudgeable. Below the coverage floor,
+`Scale` and `Kill` are both illegal: when most of the data is missing you may
+not conclude an angle is winning, and you may not conclude it is losing
+either. Operators get this one wrong in the confident direction.
+
+Every threshold carries a citation. `game/priors.py` names the source file for
+each number, and the self-check fails if one is missing. The sources are two
+private operator corpora, so a citation gives you provenance rather than
+independent verification. Treat the numbers as a starting prior and replace
+them once you have settled history of your own.
 
 ---
 
 ## Architecture
 
 ```
-  platform policy (prose)  â”€â”
-  your posting history     â”€â”¼â”€â”€â–º  cwm/synth  â”€â”€â–º  candidate world models
-  benchmark priors         â”€â”˜         â”‚              (Python, executable)
-                                      â”‚
-                          unit tests generated from
-                          your real trajectories
-                                      â”‚
-                          Thompson-sampled refinement
-                          (REx tree search, C = 5.0)
-                                      â”‚
-                                      â–¼
-                            â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                            â”‚  Code World Model â”‚  apply_action
-                            â”‚  dict state       â”‚  get_legal_actions  â—„â”€â”€ legality/
-                            â”‚  OpenSpiel-shaped â”‚  get_observations   â—„â”€â”€ attribution loss
-                            â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  get_rewards        â—„â”€â”€ contribution margin
-                                      â”‚
-        cwm/inference â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤  resample_state: sample a ranking-weight
-        (closed deck)                 â”‚  vector your results do not contradict
-                                      â–¼
-                            â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                            â”‚  solvers/ismcts   â”‚  plan, never prompt
-                            â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                                      â”‚
-      blotto Â· exp3 Â· congestion Â· signalling Â· stackelberg
-                                      â”‚
-                                      â–¼
-                          adapters/composio â†’ post, pull analytics
-                                      â”‚
-                              new trajectories â”€â”€â”
-                                      â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+  platform policy (prose)  --+
+  your posting history     --+-->  cwm/synth  -->  candidate world models
+  benchmark priors         --+         |             (Python, executable)
+                                       |
+                            unit tests generated from
+                            your real trajectories
+                                       |
+                            Thompson-sampled refinement
+                            (REx tree search, C = 5.0)
+                                       |
+                                       v
+                            +-------------------+
+                            | Code World Model  |  apply_action
+                            | dict state        |  get_legal_actions  <-- legality/
+                            | OpenSpiel-shaped  |  get_observations   <-- attribution loss
+                            +-------------------+  get_rewards        <-- contribution margin
+                                       |
+        cwm/inference -----------------+  resample_state: sample a ranking-weight
+        (closed deck)                  |  vector your results do not contradict
+                                       v
+                            +-------------------+
+                            |  solvers/ismcts   |  plan, never prompt
+                            +-------------------+
+                                       |
+        blotto | exp3 | congestion | signalling | stackelberg
+                                       |
+                                       v
+                          adapters/composio: post, pull analytics
+                                       |
+                                       +-->  new trajectories, back to the top
 ```
 
 ---
@@ -132,56 +114,53 @@ repository; the priors are not. Judge them separately.
 ## Status
 
 > [!WARNING]
-> **`fronts` executes Python that a language model wrote.** The sandbox was
-> independently reviewed and found *fully escapable* in its first form â€” an
-> allowlist of modules cannot hold, because module objects form a reachable
-> graph and `random._os` is the real `os`. It now refuses imports outright and
-> binds values instead, with the nine verified escapes kept as regression
-> tests. Anything running genuinely untrusted synthesis output should still use
-> `SubprocessSandbox` or a container. [`SECURITY.md`](SECURITY.md) has the full
-> account, including the escapes.
+> **`fronts` executes Python that a language model wrote.** The first sandbox
+> was independently reviewed and found fully escapable: an allowlist of
+> modules cannot hold, because module objects form a reachable graph and
+> `random._os` is the real `os`. The current sandbox refuses imports outright
+> and binds values instead, and the nine verified escapes are kept as
+> regression tests. If you run synthesis output you do not trust, use
+> `SubprocessSandbox` or a container. [`SECURITY.md`](SECURITY.md) has the
+> full account, including the escapes.
 
 > [!IMPORTANT]
-> **You need roughly 30 published items with settled metrics before synthesis
-> is worth attempting.** Below that floor you will get a model that fits your
-> history and predicts nothing, and `fronts accuracy` will show it as a wide
-> train/test gap. Run the model-free solvers â€” Blotto allocation and EXP3 angle
-> selection â€” until you have history worth learning from.
+> **Synthesis needs roughly 30 published items with settled metrics.** Below
+> that floor the model fits your history and predicts nothing, and
+> `fronts accuracy` shows it as a wide train/test gap. Until then, run the
+> model-free solvers for allocation and angle selection.
 > [`docs/OPERATING.md`](docs/OPERATING.md) covers the cold start.
 
 Alpha. The API will move. Everything under `src/fronts/` is exercised by the
-test suite, `ruff` and `mypy` are clean, and the core has zero runtime
-dependencies.
+test suite, `ruff` and `mypy --strict` are clean, and the core has zero
+runtime dependencies.
 
 ## Install
 
 ```bash
 git clone https://github.com/samuelowles/fronts && cd fronts
 pip install -e .                       # core: zero dependencies
-python examples/walkthrough.py         # the whole loop, seconds, no keys needed
+python examples/walkthrough.py         # the whole loop, no keys needed
 ```
 
-Add providers only when you want a real synthesis run:
+Provider SDKs are optional extras, only needed for a real synthesis run:
 
 ```bash
-pip install -e ".[all]"                # + Anthropic / OpenAI / Composio
+pip install -e ".[all]"                # Anthropic / OpenAI / Composio
 ```
 
-The game, world-model and solver layers depend on nothing outside the standard
-library. That is deliberate: a planner that needs numpy is a planner you cannot
-drop into a Lambda, and a repository that needs a wheel built before it will
-tell you anything is a repository nobody evaluates.
+The game, world-model and solver layers use only the standard library, so the
+planner runs anywhere Python runs.
 
 ---
 
 ## See it run
 
-No keys, no network, no setup. `examples/walkthrough.py` drives the whole loop
-against a reference model in under half a minute, deterministically â€” the same
-numbers on every run. Three excerpts, verbatim.
+The walkthrough needs no API keys and no network. It finishes in under half a
+minute and prints the same numbers on every run. Three excerpts from its
+output, quoted verbatim.
 
-**The instrument reads zero on a known-zero input.** Tests generated from a
-model's own history, run back against it:
+Tests generated from a model's own history score a perfect 1.00 against that
+model. That check is what makes every later accuracy reading meaningful:
 
 ```
 3. The ground-truth test: pass rate must be exactly 1.00
@@ -196,7 +175,8 @@ model's own history, run back against it:
   whose maximum is finally KNOWN to be 1.00.
 ```
 
-**Search, not prompting.** The concentration of visits *is* the confidence:
+Search output, with visit counts. You can read the planner's confidence
+directly from how the visits concentrate:
 
 ```
   action                                                         visits         value
@@ -205,8 +185,7 @@ model's own history, run back against it:
   hold                                                                1        70,513
 ```
 
-**A refusal you can audit.** Not a warning, not a penalty â€” the move is absent
-from the legal set:
+A refusal, with the rule and the source file the threshold came from:
 
 ```
   ATTEMPT: scale 'launch_theater' by 1.10x on 12 settled conversions
@@ -222,8 +201,7 @@ from the legal set:
   entirely, not prorated.
 ```
 
-Every refusal carries the rule, the reason, and the file the threshold came
-from. The CLI exits `2` on one, so a pipeline can tell "refused" from "broke".
+Refusals exit with code 2, so a pipeline can tell a refusal from a crash.
 
 ## Quickstart
 
@@ -234,43 +212,37 @@ export COMPOSIO_API_KEY=...       # platform connections
 fronts synth --history data/trajectories.jsonl --rules rules.md
 fronts accuracy                   # transition + inference, train/test/online
 fronts plan --days 7 --sims 1000
-fronts arena                      # strategies play inside the models, before you spend
+fronts arena                      # strategies play inside the models
 ```
 
-`fronts arena` is the one to notice. Following the paper's bad-sample rejection,
-it synthesises several world models, has the resulting content strategies play
-each other using one model as host in place of ground truth you do not have, and
-discards any that lose by more than 10% of the observed utility range â€” **before
-you commit a day of real output.**
+`fronts arena` synthesises several world models, has candidate strategies play
+each other inside them, and rejects any strategy that loses by more than 10%
+of the observed utility range. That filtering happens before you commit a day
+of real output to a plan.
 
 ---
 
-## Honesty about what this is
+## Limitations
 
 The reference paper's worst result is Gin rummy: 0.78 train and 0.75 test
-transition accuracy after exhausting a 500-call synthesis budget, and a heavy
-loss to a ground-truth opponent. Its diagnosis is that games with "intricate,
-multi-step procedural subroutines" resist synthesis.
+transition accuracy after a 500-call synthesis budget, and a heavy loss to a
+ground-truth opponent. Its diagnosis is that games with intricate multi-step
+procedures resist synthesis. Attribution windows, reporting lag and
+compounding cohort effects are that kind of procedure, so expect distribution
+to land closer to Gin rummy than to tic-tac-toe. `fronts accuracy` reports
+train, test and online accuracy separately. Read it before trusting a plan.
 
-Attribution windows, 24â€“72 hour reporting lag, and compounding cohort effects
-are exactly that kind of subroutine. **Expect distribution to behave more like
-Gin rummy than like tic-tac-toe.** That is why `fronts accuracy` reports
-transition and inference accuracy separately for train, test and online, and why
-you should look at it before trusting a plan. A world model that cannot predict
-your last month is not going to predict your next one.
+`docs/GAME.md` section 10 lists what the model is known to get wrong, and
+section 9 rates how well each solution concept is justified. The signalling
+module rests on an analogy that does not fully hold, and says so in its own
+docstring.
 
-`docs/GAME.md` Â§10 lists what the model is known to get wrong, and Â§9 rates each
-solution concept for how well it is actually justified. The signalling module in
-particular is an analogy resting on assumptions that do not cleanly hold, and
-says so in its own docstring.
-
-One more caveat, stated plainly. `fronts synth` writes a state-inference
-sampler beside the world model, `fronts plan` determinizes with it when it
-loads â€” and prints `open-loop` when it does not â€” and `fronts accuracy`
-scores it. But that score is an autoencoder pass rate: it certifies that
-samples are not *contradicted* by your observations, never that they are
-correctly *distributed* (`cwm/inference` opens with exactly this warning).
-A plan under the sampler is better-informed, not clairvoyant.
+One more caveat. `fronts synth` writes a state-inference sampler beside the
+world model, `fronts plan` determinizes with it when it loads (and prints
+`open-loop` when it does not), and `fronts accuracy` scores it. That score
+certifies the samples are consistent with your observations, not that they
+are drawn from the right distribution. A plan under the sampler is better
+informed, not clairvoyant.
 
 ---
 
@@ -279,15 +251,11 @@ A plan under the sampler is better-informed, not clairvoyant.
 | Document | Contents |
 |---|---|
 | [`docs/GAME.md`](docs/GAME.md) | The formal game: players, hidden state, observation model, payoffs, solution concepts, known failures |
-| [`docs/PAPER.md`](docs/PAPER.md) | The Code World Models translation â€” what transfers, what doesn't, and two errata in the original |
+| [`docs/PAPER.md`](docs/PAPER.md) | What transfers from the Code World Models paper, what does not, and two errata in the original |
 | [`docs/OPERATING.md`](docs/OPERATING.md) | The daily and weekly loop, the cold-start floor, and what to do when the model is bad |
 
 ---
 
 ## Licence
 
-MIT. Built by [owles.works](https://owles.works).
-
-Never automates spam, evasion, fake engagement, scraping behind a login, or
-posting to accounts you do not own. The legality engine exists to make several
-of those structurally impossible rather than merely discouraged.
+MIT.

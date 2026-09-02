@@ -13,7 +13,7 @@ python -m pip install -e ".[dev]"
 ```
 
 The core has no runtime dependencies, so `pip install -e .` with no extras is a
-real test â€” if anything under `src/` grows a third-party import, that install
+real test — if anything under `src/` grows a third-party import, that install
 still succeeds and CI's import job is what catches it.
 
 ## Before you open a PR
@@ -30,23 +30,23 @@ mypy src/fronts
 
 **A sandbox escape with a proof of concept.** `src/fronts/cwm/sandbox.py`
 executes code an LLM wrote. Its first version had nine working escapes, found by
-review, and the fix was architectural rather than a patch â€” see `SECURITY.md`.
+review, and the fix was architectural rather than a patch — see `SECURITY.md`.
 If you can defeat the current one, a failing test in the style of
 `test_sandbox_refuses_known_module_graph_escapes` is the most valuable thing you
 can send, and it lands with credit.
 
 **A benchmark with a citation.** Every number in `game/priors.py` names the file
 it came from. If you have measured figures for one of the three emotional
-vectors currently set to `None`, that is a genuine contribution â€” provided the
+vectors currently set to `None`, that is a genuine contribution — provided the
 source is real and named. A plausible-looking guess is worse than the `None`,
 because the `None` is honest.
 
-**A failure case.** `docs/GAME.md` Â§10 lists what the model is known to get
+**A failure case.** `docs/GAME.md` §10 lists what the model is known to get
 wrong. Additions to that list are as welcome as fixes.
 
 **A solver.** `solvers/` holds general algorithms with their literature origin
 named in the docstring. Repeated-game / folk-theorem treatment of audience trust
-is the obvious missing one, and `docs/GAME.md` Â§10 says why.
+is the obvious missing one, and `docs/GAME.md` §10 says why.
 
 ## What will get pushback
 
