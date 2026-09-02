@@ -20,12 +20,12 @@ from pathlib import Path
 
 import pytest
 
-from blotto.adapters.composio_io import DryRunAdapter
-from blotto.adapters.trajectory import TrajectoryStore
-from blotto.cwm.llm import RecordedClient, prompt_key
-from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
-from blotto.game.types import ActionKey, State, Trajectory
-from blotto.protocols import CodeWorldModel
+from fronts.adapters.composio_io import DryRunAdapter
+from fronts.adapters.trajectory import TrajectoryStore
+from fronts.cwm.llm import RecordedClient, prompt_key
+from fronts.cwm.reference import ReferenceConfig, ReferenceWorldModel
+from fronts.game.types import ActionKey, State, Trajectory
+from fronts.protocols import CodeWorldModel
 
 
 def rotating_publish_policy(model: CodeWorldModel, state: State) -> ActionKey:

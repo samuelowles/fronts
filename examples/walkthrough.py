@@ -2,7 +2,7 @@
 
 No API keys, no network, no LLM. Everything below runs against the
 hand-written ``ReferenceWorldModel`` standing in for a synthesised one --
-which is exactly how the system behaves before `blotto synth` has anything
+which is exactly how the system behaves before `fronts synth` has anything
 to learn from, and why the model-free solvers exist.
 
 Read this top to bottom; each numbered section is one move in the argument.
@@ -27,16 +27,16 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from blotto.adapters.trajectory import TrajectoryStore
-from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
-from blotto.cwm.tests_from_traj import Tolerance, generate
-from blotto.game.legality import LegalityContext, LegalityEngine, settled_count
-from blotto.game.priors import ARCHETYPE_PRIORS
-from blotto.game.types import Observation, Scale, Trajectory
-from blotto.solvers.blotto import BlottoAllocator, BlottoConfig, Front
-from blotto.solvers.congestion import CongestionConfig, crowding_adjusted_ranking
-from blotto.solvers.exp3 import EXP3, EXP3Config
-from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig
+from fronts.adapters.trajectory import TrajectoryStore
+from fronts.cwm.reference import ReferenceConfig, ReferenceWorldModel
+from fronts.cwm.tests_from_traj import Tolerance, generate
+from fronts.game.legality import LegalityContext, LegalityEngine, settled_count
+from fronts.game.priors import ARCHETYPE_PRIORS
+from fronts.game.types import Observation, Scale, Trajectory
+from fronts.solvers.blotto import BlottoAllocator, BlottoConfig, Front
+from fronts.solvers.congestion import CongestionConfig, crowding_adjusted_ranking
+from fronts.solvers.exp3 import EXP3, EXP3Config
+from fronts.solvers.ismcts import ISMCTS, ISMCTSConfig
 
 ANGLE = "launch_theater"
 
@@ -111,7 +111,7 @@ for trajectory in trajectories:
     merged.steps.extend(trajectory.steps)
     merged.chance.extend(trajectory.chance)
 
-store_dir = Path(tempfile.mkdtemp(prefix="blotto-walkthrough-"))
+store_dir = Path(tempfile.mkdtemp(prefix="fronts-walkthrough-"))
 store = TrajectoryStore(store_dir / "trajectories.jsonl")
 store.save(merged)
 stats = store.stats()
@@ -426,7 +426,7 @@ print("=" * 78)
 print(
     "Everything above ran offline in one process: history -> tests -> search\n"
     "-> allocation -> adaptation -> refusal -> re-ranking. The live loop\n"
-    "swaps the reference model for a synthesised one (`blotto synth`) and\n"
-    "the dry adapters for Composio (`blotto publish --live`); nothing else\n"
+    "swaps the reference model for a synthesised one (`fronts synth`) and\n"
+    "the dry adapters for Composio (`fronts publish --live`); nothing else\n"
     "changes. See docs/OPERATING.md for the Monday routine."
 )

@@ -37,8 +37,8 @@ jobs:
       - name: Import every module with nothing else installed
         run: |
           python - <<'PY'
-          import importlib, pkgutil, blotto
-          for module in pkgutil.walk_packages(blotto.__path__, "blotto."):
+          import importlib, pkgutil, fronts
+          for module in pkgutil.walk_packages(fronts.__path__, "fronts."):
               importlib.import_module(module.name)
           print("all modules import with zero dependencies")
           PY
@@ -70,7 +70,7 @@ jobs:
       - name: Ruff
         run: ruff check .
       - name: Mypy
-        run: mypy src/blotto
+        run: mypy src/fronts
 
   invariants:
     name: architectural invariants
@@ -84,7 +84,7 @@ jobs:
       # is enforced here rather than trusted to review.
       - name: Solvers do not import game internals
         run: |
-          if grep -rnE "from blotto\.game\.(priors|legality|payoff|action_space)" src/blotto/solvers/; then
+          if grep -rnE "from fronts\.game\.(priors|legality|payoff|action_space)" src/fronts/solvers/; then
             echo "::error::a solver imported a game internal; see AGENTS.md"
             exit 1
           fi
@@ -117,8 +117,8 @@ jobs:
       - name: Import the whole package with zero dependencies
         run: |
           PYTHONPATH=src python - <<'PY'
-          import importlib, pkgutil, blotto
-          for module in pkgutil.walk_packages(blotto.__path__, "blotto."):
+          import importlib, pkgutil, fronts
+          for module in pkgutil.walk_packages(fronts.__path__, "fronts."):
               importlib.import_module(module.name)
           print("every module imports with nothing installed")
           PY
@@ -129,7 +129,7 @@ jobs:
       - name: Every prior carries a source
         run: |
           PYTHONPATH=src python - <<'PY'
-          from blotto.game import priors
+          from fronts.game import priors
 
           TABLES = (
               "ARCHETYPE_PRIORS",

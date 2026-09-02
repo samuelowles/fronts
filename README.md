@@ -1,7 +1,7 @@
-<h1 align="center">blotto</h1>
+<h1 align="center">fronts</h1>
 
 <p align="center">
-  <strong>Plan content distribution as an imperfect-information game —<br>
+  <strong>Plan content distribution as an imperfect-information game â€”<br>
   inside a world model a language model wrote for you.</strong>
 </p>
 
@@ -14,8 +14,8 @@
 </p>
 
 Most AI distribution tooling asks a model to *be* a marketer: here is my
-product, write me ten hooks. `blotto` asks it to do something narrower and far
-more useful — read your posting history and **write the simulator**. Then it
+product, write me ten hooks. `fronts` asks it to do something narrower and far
+more useful â€” read your posting history and **write the simulator**. Then it
 plans inside that simulator with Information Set MCTS, the same way an engine
 plays poker.
 
@@ -44,7 +44,7 @@ during planning. Search does the playing, and search converts compute into
 strength in a way prompting does not.
 
 **And take the game theory seriously, because the paper doesn't.** It uses
-extensive-form games purely as planning scaffolding — no equilibria, no
+extensive-form games purely as planning scaffolding â€” no equilibria, no
 mechanism design, no signalling. But distribution genuinely is strategic: your
 daily output is a fixed force allocated across contested fronts (Colonel
 Blotto), angles decay in value as rivals crowd them (congestion games), the
@@ -58,7 +58,7 @@ when it is expensive to fake (Spence). Those five solvers are ours.
 
 **The reward is paying users.** Reach does not appear in the objective function
 at all. It appears in the *observation*, because a hook rate below 25% tells you
-the platform stopped serving your asset — but never in the reward. The corpus
+the platform stopped serving your asset â€” but never in the reward. The corpus
 this is built from records the reason: the cheapest acquisition vector
 ($30 CAC) produced 45% three-month churn and $250 LTV, while the most expensive
 ($65 CAC) produced 8% churn and $1,200 LTV. **Anything minimising CAC picks the
@@ -67,8 +67,8 @@ wrong one, and gets more confident with more data.**
 **Scaling too early is impossible, not discouraged.** `Scale` is a first-class
 move with an evidence gate in front of it: 50 settled conversions in a trailing
 7-day window before an angle may be called a winner, 300 conversions and 14 days
-before budget follows. Observations inside the 24–72 hour reporting lag count
-for zero. This is a *gate*, not a penalty — the planner cannot select the move
+before budget follows. Observations inside the 24â€“72 hour reporting lag count
+for zero. This is a *gate*, not a penalty â€” the planner cannot select the move
 at any confidence, because it never appears in the legal action set.
 
 **Data you mostly cannot see makes an angle unjudgeable, not noisy.** Below the
@@ -77,10 +77,10 @@ conclude an angle is winning and you may not conclude it is losing. This is the
 least intuitive rule in the system and the one operators most reliably get wrong
 in the confident direction.
 
-**Every number carries a citation — and the citations are unverifiable, which
+**Every number carries a citation â€” and the citations are unverifiable, which
 you should know.** `game/priors.py` holds the empirical bands, each with a
 `source` field naming the file it came from, and a prior without one cannot
-exist — the self-check enforces that programmatically. But those files are two
+exist â€” the self-check enforces that programmatically. But those files are two
 private operator corpora. You cannot open them. So the citations buy provenance,
 not independent verification, and these are one operator's measurements in their
 verticals at a point in time, not constants.
@@ -94,37 +94,37 @@ repository; the priors are not. Judge them separately.
 ## Architecture
 
 ```
-  platform policy (prose)  ─┐
-  your posting history     ─┼──►  cwm/synth  ──►  candidate world models
-  benchmark priors         ─┘         │              (Python, executable)
-                                      │
+  platform policy (prose)  â”€â”
+  your posting history     â”€â”¼â”€â”€â–º  cwm/synth  â”€â”€â–º  candidate world models
+  benchmark priors         â”€â”˜         â”‚              (Python, executable)
+                                      â”‚
                           unit tests generated from
                           your real trajectories
-                                      │
+                                      â”‚
                           Thompson-sampled refinement
                           (REx tree search, C = 5.0)
-                                      │
-                                      ▼
-                            ┌──────────────────┐
-                            │  Code World Model │  apply_action
-                            │  dict state       │  get_legal_actions  ◄── legality/
-                            │  OpenSpiel-shaped │  get_observations   ◄── attribution loss
-                            └──────────────────┘  get_rewards        ◄── contribution margin
-                                      │
-        cwm/inference ────────────────┤  resample_state: sample a ranking-weight
-        (closed deck)                 │  vector your results do not contradict
-                                      ▼
-                            ┌──────────────────┐
-                            │  solvers/ismcts   │  plan, never prompt
-                            └──────────────────┘
-                                      │
-      blotto · exp3 · congestion · signalling · stackelberg
-                                      │
-                                      ▼
-                          adapters/composio → post, pull analytics
-                                      │
-                              new trajectories ──┐
-                                      └──────────┘
+                                      â”‚
+                                      â–¼
+                            â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                            â”‚  Code World Model â”‚  apply_action
+                            â”‚  dict state       â”‚  get_legal_actions  â—„â”€â”€ legality/
+                            â”‚  OpenSpiel-shaped â”‚  get_observations   â—„â”€â”€ attribution loss
+                            â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  get_rewards        â—„â”€â”€ contribution margin
+                                      â”‚
+        cwm/inference â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤  resample_state: sample a ranking-weight
+        (closed deck)                 â”‚  vector your results do not contradict
+                                      â–¼
+                            â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                            â”‚  solvers/ismcts   â”‚  plan, never prompt
+                            â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                                      â”‚
+      blotto Â· exp3 Â· congestion Â· signalling Â· stackelberg
+                                      â”‚
+                                      â–¼
+                          adapters/composio â†’ post, pull analytics
+                                      â”‚
+                              new trajectories â”€â”€â”
+                                      â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ---
@@ -132,8 +132,8 @@ repository; the priors are not. Judge them separately.
 ## Status
 
 > [!WARNING]
-> **`blotto` executes Python that a language model wrote.** The sandbox was
-> independently reviewed and found *fully escapable* in its first form — an
+> **`fronts` executes Python that a language model wrote.** The sandbox was
+> independently reviewed and found *fully escapable* in its first form â€” an
 > allowlist of modules cannot hold, because module objects form a reachable
 > graph and `random._os` is the real `os`. It now refuses imports outright and
 > binds values instead, with the nine verified escapes kept as regression
@@ -144,19 +144,19 @@ repository; the priors are not. Judge them separately.
 > [!IMPORTANT]
 > **You need roughly 30 published items with settled metrics before synthesis
 > is worth attempting.** Below that floor you will get a model that fits your
-> history and predicts nothing, and `blotto accuracy` will show it as a wide
-> train/test gap. Run the model-free solvers — Blotto allocation and EXP3 angle
-> selection — until you have history worth learning from.
+> history and predicts nothing, and `fronts accuracy` will show it as a wide
+> train/test gap. Run the model-free solvers â€” Blotto allocation and EXP3 angle
+> selection â€” until you have history worth learning from.
 > [`docs/OPERATING.md`](docs/OPERATING.md) covers the cold start.
 
-Alpha. The API will move. Everything under `src/blotto/` is exercised by the
+Alpha. The API will move. Everything under `src/fronts/` is exercised by the
 test suite, `ruff` and `mypy` are clean, and the core has zero runtime
 dependencies.
 
 ## Install
 
 ```bash
-git clone https://github.com/owles-works/blotto && cd blotto
+git clone https://github.com/samuelowles/fronts && cd fronts
 pip install -e .                       # core: zero dependencies
 python examples/walkthrough.py         # the whole loop, seconds, no keys needed
 ```
@@ -177,7 +177,7 @@ tell you anything is a repository nobody evaluates.
 ## See it run
 
 No keys, no network, no setup. `examples/walkthrough.py` drives the whole loop
-against a reference model in under half a minute, deterministically — the same
+against a reference model in under half a minute, deterministically â€” the same
 numbers on every run. Three excerpts, verbatim.
 
 **The instrument reads zero on a known-zero input.** Tests generated from a
@@ -205,7 +205,7 @@ model's own history, run back against it:
   hold                                                                1        70,513
 ```
 
-**A refusal you can audit.** Not a warning, not a penalty — the move is absent
+**A refusal you can audit.** Not a warning, not a penalty â€” the move is absent
 from the legal set:
 
 ```
@@ -231,16 +231,16 @@ from. The CLI exits `2` on one, so a pipeline can tell "refused" from "broke".
 export ANTHROPIC_API_KEY=...      # or OPENAI_API_KEY
 export COMPOSIO_API_KEY=...       # platform connections
 
-blotto synth --history data/trajectories.jsonl --rules rules.md
-blotto accuracy                   # transition + inference, train/test/online
-blotto plan --days 7 --sims 1000
-blotto arena                      # strategies play inside the models, before you spend
+fronts synth --history data/trajectories.jsonl --rules rules.md
+fronts accuracy                   # transition + inference, train/test/online
+fronts plan --days 7 --sims 1000
+fronts arena                      # strategies play inside the models, before you spend
 ```
 
-`blotto arena` is the one to notice. Following the paper's bad-sample rejection,
+`fronts arena` is the one to notice. Following the paper's bad-sample rejection,
 it synthesises several world models, has the resulting content strategies play
 each other using one model as host in place of ground truth you do not have, and
-discards any that lose by more than 10% of the observed utility range — **before
+discards any that lose by more than 10% of the observed utility range â€” **before
 you commit a day of real output.**
 
 ---
@@ -252,21 +252,21 @@ transition accuracy after exhausting a 500-call synthesis budget, and a heavy
 loss to a ground-truth opponent. Its diagnosis is that games with "intricate,
 multi-step procedural subroutines" resist synthesis.
 
-Attribution windows, 24–72 hour reporting lag, and compounding cohort effects
+Attribution windows, 24â€“72 hour reporting lag, and compounding cohort effects
 are exactly that kind of subroutine. **Expect distribution to behave more like
-Gin rummy than like tic-tac-toe.** That is why `blotto accuracy` reports
+Gin rummy than like tic-tac-toe.** That is why `fronts accuracy` reports
 transition and inference accuracy separately for train, test and online, and why
 you should look at it before trusting a plan. A world model that cannot predict
 your last month is not going to predict your next one.
 
-`docs/GAME.md` §10 lists what the model is known to get wrong, and §9 rates each
+`docs/GAME.md` Â§10 lists what the model is known to get wrong, and Â§9 rates each
 solution concept for how well it is actually justified. The signalling module in
 particular is an analogy resting on assumptions that do not cleanly hold, and
 says so in its own docstring.
 
-One more caveat, stated plainly. `blotto synth` writes a state-inference
-sampler beside the world model, `blotto plan` determinizes with it when it
-loads — and prints `open-loop` when it does not — and `blotto accuracy`
+One more caveat, stated plainly. `fronts synth` writes a state-inference
+sampler beside the world model, `fronts plan` determinizes with it when it
+loads â€” and prints `open-loop` when it does not â€” and `fronts accuracy`
 scores it. But that score is an autoencoder pass rate: it certifies that
 samples are not *contradicted* by your observations, never that they are
 correctly *distributed* (`cwm/inference` opens with exactly this warning).
@@ -279,7 +279,7 @@ A plan under the sampler is better-informed, not clairvoyant.
 | Document | Contents |
 |---|---|
 | [`docs/GAME.md`](docs/GAME.md) | The formal game: players, hidden state, observation model, payoffs, solution concepts, known failures |
-| [`docs/PAPER.md`](docs/PAPER.md) | The Code World Models translation — what transfers, what doesn't, and two errata in the original |
+| [`docs/PAPER.md`](docs/PAPER.md) | The Code World Models translation â€” what transfers, what doesn't, and two errata in the original |
 | [`docs/OPERATING.md`](docs/OPERATING.md) | The daily and weekly loop, the cold-start floor, and what to do when the model is bad |
 
 ---

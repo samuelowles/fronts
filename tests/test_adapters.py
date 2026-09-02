@@ -19,7 +19,7 @@ from unittest import mock
 
 import pytest
 
-from blotto.adapters.composio_io import (
+from fronts.adapters.composio_io import (
     ComposioAdapter,
     ComposioConfig,
     DryRunAdapter,
@@ -28,13 +28,13 @@ from blotto.adapters.composio_io import (
     ToolkitRegistry,
     stamp_utm,
 )
-from blotto.adapters.trajectory import (
+from fronts.adapters.trajectory import (
     COLD_START_MIN_ARCHETYPES,
     COLD_START_MIN_PLATFORMS,
     COLD_START_MIN_SETTLED,
     TrajectoryStore,
 )
-from blotto.game.types import (
+from fronts.game.types import (
     ActionKey,
     Archetype,
     ClaimClass,
@@ -101,13 +101,13 @@ def _observation(**overrides: object) -> Observation:
 # ---------------------------------------------------------------------------
 
 
-def test_importing_every_blotto_module_never_imports_the_sdk() -> None:
+def test_importing_every_fronts_module_never_imports_the_sdk() -> None:
     """The core must import on a machine with no composio SDK installed --
     importing every module in the package IS the check."""
-    import blotto
+    import fronts
 
     sys.modules.pop("composio", None)
-    for module_info in _walk(blotto):
+    for module_info in _walk(fronts):
         importlib.import_module(module_info)
     offenders = [
         name for name in sys.modules if name == "composio" or name.startswith("composio.")
@@ -127,7 +127,7 @@ def _walk(package: types.ModuleType) -> list[str]:
 def test_sdk_import_is_inside_execute_not_at_module_scope() -> None:
     """The lazy import lives in the one chokepoint; a grep-shaped check that
     the module source contains no top-level SDK import."""
-    source = Path(sys.modules["blotto.adapters.composio_io"].__file__).read_text(
+    source = Path(sys.modules["fronts.adapters.composio_io"].__file__).read_text(
         encoding="utf-8"
     )
     body = source.split('"""', 2)[2]  # skip the module docstring
@@ -218,7 +218,7 @@ def test_publish_is_never_retried_even_on_transient_failure(
     adapter = ComposioAdapter(ComposioConfig(api_key="k", max_retries=3))
     adapter._client = _FakeComposio()
     adapter._client.tools = _FakeTools(always_timeouts)
-    monkeypatch.setattr("blotto.adapters.composio_io.time.sleep", lambda _: None)
+    monkeypatch.setattr("fronts.adapters.composio_io.time.sleep", lambda _: None)
     with pytest.raises(TimeoutError):
         adapter.publish(_publish(), {"text": "t", "url": "https://owles.works/"})
     assert len(adapter._client.tools.calls) == 1, "a publish must not be retried"
@@ -232,7 +232,7 @@ def test_reads_retry_with_backoff_on_transient_failure(
     _install_fake_composio(monkeypatch)
     sleeps: list[float] = []
     monkeypatch.setattr(
-        "blotto.adapters.composio_io.time.sleep", lambda seconds: sleeps.append(seconds)
+        "fronts.adapters.composio_io.time.sleep", lambda seconds: sleeps.append(seconds)
     )
     attempts: list[int] = []
 
@@ -592,7 +592,7 @@ def test_crash_mid_rewrite_leaves_previous_file_intact(
     store.save(_trajectory_with_moves())
     before = store.path.read_bytes()
 
-    with mock.patch("blotto.adapters.trajectory.os.fsync") as broken_fsync:
+    with mock.patch("fronts.adapters.trajectory.os.fsync") as broken_fsync:
         broken_fsync.side_effect = OSError("simulated crash mid-write")
         with pytest.raises(OSError):
             store.save(_trajectory_with_moves())
@@ -607,7 +607,7 @@ def test_crash_before_replace_leaves_previous_file_intact(
     store.save(_trajectory_with_moves())
     before = store.path.read_bytes()
     with mock.patch(
-        "blotto.adapters.trajectory.os.replace", side_effect=OSError("power loss")
+        "fronts.adapters.trajectory.os.replace", side_effect=OSError("power loss")
     ), pytest.raises(OSError):
         store.save(_trajectory_with_moves())
     assert store.path.read_bytes() == before

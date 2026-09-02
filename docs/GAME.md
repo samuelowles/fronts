@@ -1,6 +1,6 @@
 # The distribution game
 
-A formal specification of the environment `blotto` plans inside.
+A formal specification of the environment `fronts` plans inside.
 
 This document defines a game. It does not claim the game is true. It claims the
 game is *less wrong than the alternative*, which is to treat distribution as a

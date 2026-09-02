@@ -14,22 +14,22 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
-import blotto.game.payoff as payoff_module
-from blotto.game import priors
-from blotto.game.action_space import (
+import fronts.game.payoff as payoff_module
+from fronts.game import priors
+from fronts.game.action_space import (
     ActionCodec,
     ActionDecodeError,
     enumerate_publishes,
     utm_content_id,
 )
-from blotto.game.legality import (
+from fronts.game.legality import (
     AllocationChange,
     LegalityContext,
     LegalityEngine,
     OperatorPolicy,
     settled_count,
 )
-from blotto.game.payoff import (
+from fronts.game.payoff import (
     Economics,
     PayoffHealth,
     cac_payback_months,
@@ -39,7 +39,7 @@ from blotto.game.payoff import (
     reward,
     true_conversions,
 )
-from blotto.game.types import (
+from fronts.game.types import (
     Archetype,
     ClaimClass,
     CtaMode,

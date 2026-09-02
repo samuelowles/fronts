@@ -2,7 +2,7 @@
 
 What you actually do on a Monday.
 
-`blotto` is not a content generator with a planner bolted on. It is a planner
+`fronts` is not a content generator with a planner bolted on. It is a planner
 that happens to need content as its action space. The distinction shows up in
 the daily routine: most of the work is maintaining a world model that predicts
 your results, and the plan falls out of that almost for free.
@@ -18,7 +18,7 @@ partially unobservable forever.
 
 A workable floor is **30 published items with settled metrics**, spanning at
 least two archetypes and two platforms. Below that, synthesis will produce a
-model that fits your history and predicts nothing, and `blotto accuracy` will
+model that fits your history and predicts nothing, and `fronts accuracy` will
 show it: high train accuracy, poor test accuracy. That gap is the diagnostic,
 which is exactly why the report separates them.
 
@@ -32,11 +32,11 @@ you have history worth learning from.
 ## Daily
 
 ```
-blotto ingest      # pull yesterday's metrics; mark anything inside the lag partial
-blotto plan        # ISMCTS over the next N days, inside the current world model
-blotto brief       # emit the plan as content briefs
+fronts ingest      # pull yesterday's metrics; mark anything inside the lag partial
+fronts plan        # ISMCTS over the next N days, inside the current world model
+fronts brief       # emit the plan as content briefs
                    # -- you or your pipeline produce the actual creative --
-blotto publish     # ship via Composio, stamping each item's utm_content
+fronts publish     # ship via Composio, stamping each item's utm_content
 ```
 
 Two things to notice.
@@ -55,9 +55,9 @@ want it loud rather than shipped.
 ## Weekly
 
 ```
-blotto synth       # re-synthesise the world model from updated history
-blotto accuracy    # train / test / online, transition and inference
-blotto arena       # candidate strategies play inside the models
+fronts synth       # re-synthesise the world model from updated history
+fronts accuracy    # train / test / online, transition and inference
+fronts arena       # candidate strategies play inside the models
 ```
 
 `synth` writes two artefacts side by side: the world model and an

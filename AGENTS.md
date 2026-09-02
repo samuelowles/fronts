@@ -6,7 +6,7 @@ produced bugs that passed every test.
 
 ## What this is in one paragraph
 
-`blotto` models organic content distribution as a finite-horizon
+`fronts` models organic content distribution as a finite-horizon
 imperfect-information game and plans inside a world model that an LLM writes
 from posting history. The LLM's job is to produce the *simulator*, not the
 *policy*. Search does the playing. If you find yourself adding an LLM call

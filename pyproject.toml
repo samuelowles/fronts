@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "blotto"
+name = "fronts"
 version = "0.1.0"
 description = "Plan organic distribution as an imperfect-information game, inside a world model an LLM wrote."
 readme = "README.md"
@@ -44,23 +44,23 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
 ]
-all = ["blotto[llm,platforms]"]
+all = ["fronts[llm,platforms]"]
 
 [project.scripts]
-blotto = "blotto.cli:app"
+fronts = "fronts.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/owles-works/blotto"
-Source = "https://github.com/owles-works/blotto"
+Homepage = "https://github.com/samuelowles/fronts"
+Source = "https://github.com/samuelowles/fronts"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/blotto"]
+packages = ["src/fronts"]
 
 # Ship the example config in the wheel too, next to the package: a config
 # format nobody can find an example of is a format nobody configures, and
-# `blotto.example.toml` is the documented starting point for [measurement].
+# `fronts.example.toml` is the documented starting point for [measurement].
 [tool.hatch.build.targets.wheel.force-include]
-"blotto.example.toml" = "blotto.example.toml"
+"fronts.example.toml" = "fronts.example.toml"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

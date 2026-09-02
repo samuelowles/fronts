@@ -15,23 +15,23 @@ from pathlib import Path
 
 import pytest
 
-from blotto.adapters.composio_io import (
+from fronts.adapters.composio_io import (
     DryRunAdapter,
     PublishReceipt,
     ToolkitEntry,
     ToolkitRegistry,
 )
-from blotto.adapters.trajectory import TrajectoryStats, TrajectoryStore
-from blotto.config import Paths, load
-from blotto.cwm.arena import ArenaConfig, ArenaResult, play_episode
-from blotto.cwm.arena import run as arena_run
-from blotto.cwm.inference import (
+from fronts.adapters.trajectory import TrajectoryStats, TrajectoryStore
+from fronts.config import Paths, load
+from fronts.cwm.arena import ArenaConfig, ArenaResult, play_episode
+from fronts.cwm.arena import run as arena_run
+from fronts.cwm.inference import (
     HISTORY_INFERENCE_CLASS,
     STATE_INFERENCE_CLASS,
     synthesise_history_inference,
     synthesise_state_inference,
 )
-from blotto.cwm.sandbox import (
+from fronts.cwm.sandbox import (
     Sandbox,
     SandboxConfig,
     SandboxTimeout,
@@ -40,19 +40,19 @@ from blotto.cwm.sandbox import (
     _CappedBuffer,
     guard_methods,
 )
-from blotto.cwm.synth import SynthConfig, default_api_spec
-from blotto.cwm.value import (
+from fronts.cwm.synth import SynthConfig, default_api_spec
+from fronts.cwm.value import (
     VALUE_FUNCTION_CLASS,
     select_best,
     synthesise_value_functions,
 )
-from blotto.game.legality import (
+from fronts.game.legality import (
     ACQUISITION_CTAS,
     LOW_RISK_CLAIM_CLASSES,
     SERVICE_CTAS,
     OperatorPolicy,
 )
-from blotto.game.priors import (
+from fronts.game.priors import (
     ARCHETYPE_PRIORS,
     PLATFORM_PRIORS,
     SEMANTIC_TIER_PRIORS,
@@ -63,7 +63,7 @@ from blotto.game.priors import (
     SemanticPrior,
     VectorPrior,
 )
-from blotto.game.types import (
+from fronts.game.types import (
     Archetype,
     ClaimClass,
     CtaMode,
@@ -77,7 +77,7 @@ from blotto.game.types import (
     Step,
     Trajectory,
 )
-from blotto.solvers.signalling import SignalCost, SignallingConfig, separating_power
+from fronts.solvers.signalling import SignalCost, SignallingConfig, separating_power
 
 # ---------------------------------------------------------------------------
 # SubprocessSandbox -- the SECURITY.md option, previously shipped untested.
@@ -438,7 +438,7 @@ def test_store_stats_returns_the_cold_start_verdict(tmp_path: Path) -> None:
 
 def test_paths_load_from_config_and_default_sensibly(tmp_path: Path) -> None:
     assert Paths().history == Path("data/trajectories.jsonl")
-    config_file = tmp_path / "blotto.toml"
+    config_file = tmp_path / "fronts.toml"
     config_file.write_text(
         '[paths]\nhistory = "elsewhere/history.jsonl"\n', encoding="utf-8"
     )
@@ -472,7 +472,7 @@ def test_signalling_config_guards_the_zero_denominator() -> None:
 
 def test_operator_policy_defaults_are_the_corpus_gates() -> None:
     """The two corpus gates -- 50/7d creative judgement, 300/14d spend
-    commitment (``blotto.game.types``, "Evidence gates") -- are what
+    commitment (``fronts.game.types``, "Evidence gates") -- are what
     ``OperatorPolicy`` enforces by default; this pins the numbers so a
     tuning edit has to be deliberate, not a drive-by."""
     policy = OperatorPolicy()

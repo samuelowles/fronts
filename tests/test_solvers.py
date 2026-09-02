@@ -17,24 +17,24 @@ import random
 
 import pytest
 
-from blotto.game.types import State
-from blotto.protocols import Planner
-from blotto.solvers.blotto import BlottoAllocator, BlottoConfig, Front
-from blotto.solvers.congestion import (
+from fronts.game.types import State
+from fronts.protocols import Planner
+from fronts.solvers.blotto import BlottoAllocator, BlottoConfig, Front
+from fronts.solvers.congestion import (
     CongestionConfig,
     CongestionGame,
     congested_payoff,
     crowding_adjusted_ranking,
 )
-from blotto.solvers.exp3 import EXP3, EXP3P, EXP3Config, EXP3PConfig, regret_bound
-from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig, MCTSResult
-from blotto.solvers.signalling import (
+from fronts.solvers.exp3 import EXP3, EXP3P, EXP3Config, EXP3PConfig, regret_bound
+from fronts.solvers.ismcts import ISMCTS, ISMCTSConfig, MCTSResult
+from fronts.solvers.signalling import (
     ClaimCredibility,
     SignalCost,
     separates,
     separating_power,
 )
-from blotto.solvers.stackelberg import (
+from fronts.solvers.stackelberg import (
     LeaderEstimate,
     best_response,
     robust_best_response,
@@ -620,7 +620,7 @@ def test_uct_formula_places_availability_inside_the_logarithm() -> None:
     what the exploration term should be reaching for. If this test ever fails
     with ``narrow``, the logarithm and the denominator have been swapped back.
     """
-    from blotto.solvers.ismcts import _Edge, _Node
+    from fronts.solvers.ismcts import _Edge, _Node
 
     node = _Node()
     node.visits = 1000

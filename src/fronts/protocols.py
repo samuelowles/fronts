@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from blotto.game.types import ActionKey, Observation, State
+from fronts.game.types import ActionKey, Observation, State
 
 __all__ = [
     "CodeWorldModel",
@@ -96,7 +96,7 @@ class CodeWorldModel(Protocol):
 
         The operator's reward is contribution margin from paying users. It is
         not reach, not engagement, and not attributed conversions taken at face
-        value. See ``blotto.game.payoff``.
+        value. See ``fronts.game.payoff``.
         """
         ...
 
@@ -165,7 +165,7 @@ class ValueFunction(Protocol):
     Synthesised, never fitted -- there is no ground truth to fit against. The
     paper's remedy is selection rather than training: generate several
     candidates and run a tournament between the agents that use them. We do the
-    same, in ``blotto.cwm.value``.
+    same, in ``fronts.cwm.value``.
     """
 
     def __call__(self, state: State, player: int) -> float: ...

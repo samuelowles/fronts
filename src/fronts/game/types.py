@@ -113,7 +113,7 @@ ActionKey = NewType("ActionKey", str)
 
 The paper defines ``Action = str`` and we keep that at the CWM boundary: the
 synthesised Python manipulates strings, never our dataclasses. ``ActionCodec``
-in ``blotto.game.action_space`` is the only thing allowed to cross that line.
+in ``fronts.game.action_space`` is the only thing allowed to cross that line.
 """
 
 
@@ -121,7 +121,7 @@ in ``blotto.game.action_space`` is the only thing allowed to cross that line.
 # Action space dimensions.
 #
 # These enums are not invented. Each carries an empirical prior drawn from the
-# DTC Engineer / GTM Engineer corpora, wired up in ``blotto.game.priors``.
+# DTC Engineer / GTM Engineer corpora, wired up in ``fronts.game.priors``.
 # Where a member has a benchmark attached, the docstring cites its source file
 # so that no number in this repository is unattributable.
 # ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ class EmotionalVector(str, Enum):
     cheapest-CAC vector is a false positive: Aspiration acquires at $30 CAC with
     45% M3 churn and $250 LTV, while Exhaustion acquires at $65 CAC with 8% M3
     churn and $1,200 LTV. A reward function that optimises CAC picks the wrong
-    one. See ``blotto.game.payoff``.
+    one. See ``fronts.game.payoff``.
     """
 
     ANGER_INJUSTICE = "anger_injustice"
@@ -218,7 +218,7 @@ class ClaimClass(str, Enum):
 
     Drives two separate systems. Compliance: ``get_legal_actions`` refuses
     claims the operator cannot substantiate. Signalling: a claim's separating
-    power in ``blotto.solvers.signalling`` depends on how expensive it is for a
+    power in ``fronts.solvers.signalling`` depends on how expensive it is for a
     low-quality sender to imitate.
     """
 
@@ -285,7 +285,7 @@ class Scale:
     angle: str
     factor: float
     """Multiplier on current allocation. Velocity limits are enforced in
-    ``blotto.game.legality``, not here."""
+    ``fronts.game.legality``, not here."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,8 +321,8 @@ class RankingWeights:
     """The platform's current objective, which we never see and which drifts.
 
     Recovering a posterior over this is the job of ``resample_state`` in
-    ``blotto.cwm.inference``. Best-responding to the estimate is the job of
-    ``blotto.solvers.stackelberg``.
+    ``fronts.cwm.inference``. Best-responding to the estimate is the job of
+    ``fronts.solvers.stackelberg``.
     """
 
     hook_rate: float = 1.0
@@ -335,7 +335,7 @@ class RankingWeights:
     external_link_penalty: float = 0.0
     drift_rate: float = 0.0
     """Per-step magnitude of random walk. Non-zero drift is why angle selection
-    uses EXP3 rather than a stochastic bandit -- see ``blotto.solvers.exp3``."""
+    uses EXP3 rather than a stochastic bandit -- see ``fronts.solvers.exp3``."""
 
 
 @dataclass(slots=True)
@@ -432,7 +432,7 @@ class Trajectory:
     """A sequence of the operator's own moves and observations.
 
     This is the *only* training signal available in the closed-deck setting, and
-    it is what unit tests are generated from in ``blotto.cwm.tests_from_traj``.
+    it is what unit tests are generated from in ``fronts.cwm.tests_from_traj``.
     """
 
     steps: list[Step] = field(default_factory=list)
@@ -481,6 +481,6 @@ class Trajectory:
 #
 # The two thresholds differ because the decisions differ: 50/7d licenses a
 # creative-level judgement, 300/14d licenses a spend commitment. Both are
-# enforced in ``blotto.game.legality`` -- ``OperatorPolicy`` carries the
+# enforced in ``fronts.game.legality`` -- ``OperatorPolicy`` carries the
 # thresholds, and every refusal cites its corpus source at the refusal site.
 # ---------------------------------------------------------------------------

@@ -17,11 +17,11 @@ from pathlib import Path
 
 import pytest
 
-from blotto.adapters.trajectory import TrajectoryStore
-from blotto.cli import _build_parser, app
-from blotto.config import example, load
-from blotto.game.action_space import ActionCodec
-from blotto.game.types import (
+from fronts.adapters.trajectory import TrajectoryStore
+from fronts.cli import _build_parser, app
+from fronts.config import example, load
+from fronts.game.action_space import ActionCodec
+from fronts.game.types import (
     Archetype,
     ClaimClass,
     CtaMode,
@@ -105,7 +105,7 @@ def _write_config(tmp_path: Path, *, measurements: bool = True) -> Path:
     if not measurements:
         marker = text.index("[measurement]")
         text = text[:marker]
-    path = tmp_path / "blotto.toml"
+    path = tmp_path / "fronts.toml"
     path.write_text(text, encoding="utf-8")
     return path
 
@@ -191,7 +191,7 @@ def test_no_subcommand_prints_help_and_exits_nonzero(capsys: pytest.CaptureFixtu
 def test_cli_uses_argparse_only() -> None:
     """typer and rich appear nowhere, by design: a CLI that needs a wheel
     before it will talk is a CLI nobody runs on the box that matters."""
-    source = Path(sys.modules["blotto.cli"].__file__).read_text(encoding="utf-8")
+    source = Path(sys.modules["fronts.cli"].__file__).read_text(encoding="utf-8")
     assert "typer" not in source.lower()
     assert "rich" not in source.lower()
     assert "argparse" in source
@@ -217,7 +217,7 @@ def test_publish_without_live_performs_no_live_call(
         raise AssertionError("a dry-run publish reached the Composio SDK")
 
     monkeypatch.setattr(
-        "blotto.adapters.composio_io.ComposioAdapter._execute", no_live_calls
+        "fronts.adapters.composio_io.ComposioAdapter._execute", no_live_calls
     )
     code = app(["publish", "--config", str(config)])
     out = capsys.readouterr().out
@@ -241,7 +241,7 @@ def test_publish_live_uses_the_composio_adapter(
     _write_plan(tmp_path, [_CODEC.encode(_publish())])
     _write_history_with_conversions(tmp_path, conversions=60)
     monkeypatch.setattr(
-        "blotto.adapters.composio_io.ComposioAdapter._execute",
+        "fronts.adapters.composio_io.ComposioAdapter._execute",
         lambda self, slug, arguments, **_: {"id": "tw-1"},
     )
     code = app(["publish", "--config", str(config), "--live"])
@@ -356,7 +356,7 @@ def test_ingest_dry_runs_without_credentials(
         raise AssertionError("ingest without credentials must not call the SDK")
 
     monkeypatch.setattr(
-        "blotto.adapters.composio_io.ComposioAdapter._execute", no_sdk
+        "fronts.adapters.composio_io.ComposioAdapter._execute", no_sdk
     )
     assert app(["ingest", "--config", str(config)]) == 0
     out = capsys.readouterr().out
@@ -397,8 +397,8 @@ def test_plan_without_a_model_is_a_clean_error(
 
 
 def test_example_toml_at_repo_root_parses_and_matches_example() -> None:
-    shipped = _REPO_ROOT / "blotto.example.toml"
-    assert shipped.exists(), "blotto.example.toml ships at the repo root"
+    shipped = _REPO_ROOT / "fronts.example.toml"
+    assert shipped.exists(), "fronts.example.toml ships at the repo root"
     text = shipped.read_text(encoding="utf-8")
     assert text == example(), "the shipped file and example() must not drift"
     config = load(shipped)

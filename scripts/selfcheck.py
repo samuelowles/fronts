@@ -23,15 +23,15 @@ from datetime import date
 
 # Importing every new module IS the first check: a module that cannot be
 # imported cannot be wrong in interesting ways, only boring ones.
-from blotto.game import action_space, legality, payoff, priors
-from blotto.game.action_space import ActionCodec
-from blotto.game.legality import (
+from fronts.game import action_space, legality, payoff, priors
+from fronts.game.action_space import ActionCodec
+from fronts.game.legality import (
     LegalityContext,
     LegalityEngine,
     OperatorPolicy,
     settled_count,
 )
-from blotto.game.payoff import (
+from fronts.game.payoff import (
     Economics,
     PayoffHealth,
     allowable_cac,
@@ -42,7 +42,7 @@ from blotto.game.payoff import (
     reward,
     true_conversions,
 )
-from blotto.game.types import (
+from fronts.game.types import (
     Archetype,
     ClaimClass,
     CtaMode,
@@ -58,11 +58,11 @@ from blotto.game.types import (
     Scale,
     SemanticTier,
 )
-from blotto.solvers.blotto import BlottoAllocator, BlottoConfig, Front
-from blotto.solvers.congestion import CongestionGame
-from blotto.solvers.exp3 import EXP3, EXP3Config
-from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig
-from blotto.solvers.signalling import SignalCost, separates
+from fronts.solvers.blotto import BlottoAllocator, BlottoConfig, Front
+from fronts.solvers.congestion import CongestionGame
+from fronts.solvers.exp3 import EXP3, EXP3Config
+from fronts.solvers.ismcts import ISMCTS, ISMCTSConfig
+from fronts.solvers.signalling import SignalCost, separates
 
 CHECKS: list[Callable[[], None]] = []
 
@@ -524,7 +524,7 @@ def separating_condition_known_case() -> None:
 def cwm_sandbox_blocks_forbidden_import() -> None:
     """The sandbox refuses ``import os`` and dunder attribute access at
     compile time, naming the offending node and its line."""
-    from blotto.cwm.sandbox import Sandbox, SandboxConfig, SandboxViolation
+    from fronts.cwm.sandbox import Sandbox, SandboxConfig, SandboxViolation
 
     for source in ("import os", "x = object.__subclasses__()"):
         try:
@@ -541,8 +541,8 @@ def cwm_reference_reaches_terminal() -> None:
     producing settled observations along the way."""
     import random
 
-    from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
-    from blotto.game.types import TERMINAL_PLAYER
+    from fronts.cwm.reference import ReferenceConfig, ReferenceWorldModel
+    from fronts.game.types import TERMINAL_PLAYER
 
     model = ReferenceWorldModel(ReferenceConfig(horizon=6))
     state = model.initial_state()
@@ -572,7 +572,7 @@ def cwm_reference_reaches_terminal() -> None:
 def cwm_observations_carry_no_hidden_state() -> None:
     """No player's observation exposes theta, standing, saturation, belief
     or fatigue -- the operator sees the degraded dashboard and nothing else."""
-    from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
+    from fronts.cwm.reference import ReferenceConfig, ReferenceWorldModel
 
     model = ReferenceWorldModel(ReferenceConfig(horizon=3))
     state = model.initial_state()
@@ -594,7 +594,7 @@ def cwm_refinement_selection_is_deterministic() -> None:
     sampling favours the high-pass-rate node in aggregate."""
     import random
 
-    from blotto.cwm.refine import RefinementNode, RefinementTree
+    from fronts.cwm.refine import RefinementNode, RefinementTree
 
     tree = RefinementTree(
         nodes=[RefinementNode("good", 0.9), RefinementNode("bad", 0.1)]

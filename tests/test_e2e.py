@@ -49,25 +49,25 @@ import pytest
 # rules text and the fixture-wrapper all live in the CWM unit suite already.
 from test_cwm import RULES_TEXT, V1_SOURCE, V2_SOURCE, fenced, make_trajectory
 
-from blotto.adapters.composio_io import DryRunAdapter
-from blotto.adapters.trajectory import (
+from fronts.adapters.composio_io import DryRunAdapter
+from fronts.adapters.trajectory import (
     COLD_START_MIN_SETTLED,
     TrajectoryStore,
 )
-from blotto.cli import _brief_for, _legality_context, _play_trajectory, _sample_chance, app
-from blotto.config import default_config
-from blotto.cwm.arena import ArenaConfig
-from blotto.cwm.arena import run as arena_run
-from blotto.cwm.inference import FallbackInference
-from blotto.cwm.llm import RecordedClient
-from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
-from blotto.cwm.report import ModelQualityReport
-from blotto.cwm.sandbox import Sandbox, SandboxConfig, instantiate
-from blotto.cwm.synth import SynthConfig, build_prompt, synthesise
-from blotto.cwm.tests_from_traj import NO_CRASH, ModelTest, Tolerance, generate, split
-from blotto.game.action_space import ActionCodec
-from blotto.game.legality import LegalityEngine
-from blotto.game.types import (
+from fronts.cli import _brief_for, _legality_context, _play_trajectory, _sample_chance, app
+from fronts.config import default_config
+from fronts.cwm.arena import ArenaConfig
+from fronts.cwm.arena import run as arena_run
+from fronts.cwm.inference import FallbackInference
+from fronts.cwm.llm import RecordedClient
+from fronts.cwm.reference import ReferenceConfig, ReferenceWorldModel
+from fronts.cwm.report import ModelQualityReport
+from fronts.cwm.sandbox import Sandbox, SandboxConfig, instantiate
+from fronts.cwm.synth import SynthConfig, build_prompt, synthesise
+from fronts.cwm.tests_from_traj import NO_CRASH, ModelTest, Tolerance, generate, split
+from fronts.game.action_space import ActionCodec
+from fronts.game.legality import LegalityEngine
+from fronts.game.types import (
     CHANCE_PLAYER,
     OPERATOR,
     TERMINAL_PLAYER,
@@ -89,9 +89,9 @@ from blotto.game.types import (
     Step,
     Trajectory,
 )
-from blotto.protocols import CodeWorldModel
-from blotto.solvers.blotto import BlottoAllocator, BlottoConfig, Front
-from blotto.solvers.ismcts import ISMCTS, ISMCTSConfig
+from fronts.protocols import CodeWorldModel
+from fronts.solvers.blotto import BlottoAllocator, BlottoConfig, Front
+from fronts.solvers.ismcts import ISMCTS, ISMCTSConfig
 
 pytestmark = pytest.mark.e2e
 
@@ -154,7 +154,7 @@ def _write_config(tmp_path: Path, *, measurements: bool = True) -> Path:
     )
     if measurements:
         text += "\n[measurement]\nattribution_coverage = 0.72\nincrementality = 0.70\n"
-    path = tmp_path / "blotto.toml"
+    path = tmp_path / "fronts.toml"
     path.write_text(text, encoding="utf-8")
     return path
 
@@ -388,7 +388,7 @@ def test_reference_model_scores_one_through_the_report_surface(
     train_rate = _pass_rate(train, subject)
     test_rate = _pass_rate(held_out, subject)
     # The online split is self-play under the model's own policy, recorded
-    # and tested like any other history -- the same shape ``blotto accuracy``
+    # and tested like any other history -- the same shape ``fronts accuracy``
     # produces.
     online_trajectory = _play_self_play_episode(subject, steps=30, seed=3)
     online_rate = _pass_rate(
@@ -422,9 +422,9 @@ def _play_self_play_episode(
 ) -> Trajectory:
     """A self-play episode through the CLI's own recorder.
 
-    Reuses ``blotto.cli._play_trajectory`` rather than reimplementing the
+    Reuses ``fronts.cli._play_trajectory`` rather than reimplementing the
     observation-recording convention: the online split is only comparable
-    to the operator's ``blotto accuracy`` output if it is produced the same
+    to the operator's ``fronts accuracy`` output if it is produced the same
     way.
     """
     rng = random.Random(seed)
@@ -780,7 +780,7 @@ def test_same_seed_produces_an_identical_plan_in_a_fresh_process(
     argv = [
         sys.executable,
         "-m",
-        "blotto.cli",
+        "fronts.cli",
         "plan",
         "--config",
         str(config),
@@ -823,7 +823,7 @@ class StateInferenceSampler:
 def test_plan_determinizes_with_the_sampler_beside_the_model(
     tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
-    """``blotto synth`` writes ``inference.py`` beside the model; ``plan``
+    """``fronts synth`` writes ``inference.py`` beside the model; ``plan``
     must find it, name the determinization it used, and stay deterministic.
     Without the file the same plan runs open-loop -- and says that instead,
     because a planner that will not name its determinization is a planner

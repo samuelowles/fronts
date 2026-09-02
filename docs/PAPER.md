@@ -1,6 +1,6 @@
 # From Code World Models to distribution
 
-How `blotto` applies **Code World Models for General Game Playing**
+How `fronts` applies **Code World Models for General Game Playing**
 (Lehrach, Hennes, Lázaro-Gredilla et al., Google DeepMind, arXiv:2510.04542) to
 organic content distribution — and, equally important, where the paper stops and
 we are on our own.

@@ -20,9 +20,9 @@ from pathlib import Path
 
 import pytest
 
-from blotto.cwm.arena import ArenaConfig, play_episode
-from blotto.cwm.arena import run as arena_run
-from blotto.cwm.inference import (
+from fronts.cwm.arena import ArenaConfig, play_episode
+from fronts.cwm.arena import run as arena_run
+from fronts.cwm.inference import (
     FallbackInference,
     inference_accuracy,
     load_state_inference,
@@ -30,18 +30,18 @@ from blotto.cwm.inference import (
     synthesise_state_inference_source,
     validate_history,
 )
-from blotto.cwm.llm import (
+from fronts.cwm.llm import (
     FixtureMiss,
     RecordedClient,
     RecordingClient,
     extract_code,
     prompt_key,
 )
-from blotto.cwm.reference import ReferenceConfig, ReferenceWorldModel
-from blotto.cwm.refine import RefineConfig, RefinementNode, RefinementTree
-from blotto.cwm.refine import refine as refine_tree
-from blotto.cwm.report import ModelQualityReport
-from blotto.cwm.sandbox import (
+from fronts.cwm.reference import ReferenceConfig, ReferenceWorldModel
+from fronts.cwm.refine import RefineConfig, RefinementNode, RefinementTree
+from fronts.cwm.refine import refine as refine_tree
+from fronts.cwm.report import ModelQualityReport
+from fronts.cwm.sandbox import (
     CWM_METHOD_PARAMS,
     ProtocolViolation,
     Sandbox,
@@ -52,8 +52,8 @@ from blotto.cwm.sandbox import (
     check_protocol_methods,
     instantiate,
 )
-from blotto.cwm.synth import SynthConfig, build_prompt, synthesise
-from blotto.cwm.tests_from_traj import (
+from fronts.cwm.synth import SynthConfig, build_prompt, synthesise
+from fronts.cwm.tests_from_traj import (
     LEGALITY,
     NO_CRASH,
     OBSERVATION_RECONSTRUCTION,
@@ -65,8 +65,8 @@ from blotto.cwm.tests_from_traj import (
     replay,
     split,
 )
-from blotto.game.action_space import ActionCodec
-from blotto.game.types import (
+from fronts.game.action_space import ActionCodec
+from fronts.game.types import (
     TERMINAL_PLAYER,
     Archetype,
     ClaimClass,
@@ -82,7 +82,7 @@ from blotto.game.types import (
     Step,
     Trajectory,
 )
-from blotto.protocols import CodeWorldModel
+from fronts.protocols import CodeWorldModel
 
 pytestmark = pytest.mark.unit
 
@@ -830,8 +830,8 @@ def test_state_inference_synthesises_from_fixture() -> None:
 
 
 def test_state_inference_source_persists_and_reloads() -> None:
-    """The synth -> plan handoff: what ``blotto synth`` writes to disk,
-    ``blotto plan`` must read back as the same working sampler."""
+    """The synth -> plan handoff: what ``fronts synth`` writes to disk,
+    ``fronts plan`` must read back as the same working sampler."""
     client = RecordedClient(FIXTURES / "state_inference.jsonl")
     source = synthesise_state_inference_source(
         client, SynthConfig(), RULES_TEXT, [make_trajectory()]
@@ -994,7 +994,7 @@ def test_report_formats_train_test_and_online() -> None:
 
 def test_report_renders_unmeasured_inference_as_na() -> None:
     """The default is None -- not measured -- and the table must say so
-    rather than manufacture a number (``blotto accuracy`` relies on this)."""
+    rather than manufacture a number (``fronts accuracy`` relies on this)."""
     report = ModelQualityReport(
         transition_accuracy_train=0.9,
         transition_accuracy_test=0.8,
@@ -1127,7 +1127,7 @@ def test_inference_accuracy_rejects_an_unknown_mode() -> None:
 def test_inference_accuracy_counts_a_raising_sampler_as_misses() -> None:
     """The module contract is fall back, never propagate: a sampler that
     cannot be asked reads as a bad score, not a stack trace out of
-    ``blotto accuracy``."""
+    ``fronts accuracy``."""
 
     class Hostile:
         def resample_state(self, history: list, player_id: int) -> dict:
@@ -1149,7 +1149,7 @@ def test_load_state_inference_guards_the_sampler(
     """The persisted sampler came off disk and is untrusted: the loader must
     wrap ``resample_state`` in the timeout guard, so a spinning sampler costs
     the planner one skipped determinization, never the whole run."""
-    import blotto.cwm.inference as inference_module
+    import fronts.cwm.inference as inference_module
 
     seen: dict[str, object] = {}
     real_guard = inference_module.guard_methods

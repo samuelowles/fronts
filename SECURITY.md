@@ -1,6 +1,6 @@
 # Security
 
-`blotto` executes Python that a language model wrote. That is the whole point of
+`fronts` executes Python that a language model wrote. That is the whole point of
 the architecture, and it is also the entire security story. This document exists
 because a repository that does this and *doesn't* say so plainly should not be
 trusted.
@@ -11,14 +11,14 @@ The synthesised world model is code produced by an LLM from your platform rules
 and your posting history. It is not reviewed by a human before it runs. It is
 not signed. If your provider is compromised, if your rules file contains a
 prompt injection, or if the model simply hallucinates something destructive, the
-output of that is a Python module that `blotto` will load and call thousands of
+output of that is a Python module that `fronts` will load and call thousands of
 times inside a search loop.
 
 So the question is not "is the sandbox good" but "what happens when it fails".
 
 ## What the sandbox actually does
 
-`src/blotto/cwm/sandbox.py` refuses, at compile time via AST inspection:
+`src/fronts/cwm/sandbox.py` refuses, at compile time via AST inspection:
 
 - **every `import` and `from ... import` statement**, without exception;
 - `open`, `exec`, `eval`, `compile`;
@@ -76,7 +76,7 @@ Know also what the shipped CLI does and does not wrap. The per-call guard
 (`Sandbox.guarded`) costs one worker thread per call, so the planning loop —
 which makes on the order of 10^5 model calls per plan — runs the loaded world
 model *unguarded* in-process; a model whose method body loops forever will
-hang `blotto plan` until you kill it. The persisted inference sampler IS
+hang `fronts plan` until you kill it. The persisted inference sampler IS
 guarded (one call per determinization is cheap), and the AST gate below runs
 on everything before it executes. If a hang from hostile source is in your
 threat model, that is `SubprocessSandbox` territory, not a reason to thread
@@ -97,7 +97,7 @@ trade-off you are making.
 - **Recorded fixtures** under `fixtures/` contain prompts and responses. If you
   re-record against a live provider, check before committing that your rules
   text does not embed anything private — the whole prompt is stored verbatim.
-- **`blotto publish` is dry-run by default.** `--live` is required for any real
+- **`fronts publish` is dry-run by default.** `--live` is required for any real
   call. This is deliberate: the failure mode of a planner bug is public.
 - **Nothing here bypasses platform rate limits, evades detection, fabricates
   engagement, or scrapes behind a login.** The legality engine makes several of
