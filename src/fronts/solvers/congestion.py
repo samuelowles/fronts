@@ -130,7 +130,7 @@ class CongestionGame:
                 raise ValueError(f"player {player!r} references unknown angles {unknown}")
             self.angle_sets[player] = allowed
 
-    # -- payoffs -------------------------------------------------------------
+    # --- payoffs -------------------------------------------------------------
 
     def _occupancy(self, profile: dict[str, str], angle: str) -> float:
         headcount = sum(1 for chosen in profile.values() if chosen == angle)
@@ -173,7 +173,7 @@ class CongestionGame:
 
         ``sum over angles of sum_{k=1..headcount} c_a(k)`` where ``c_a(k)`` is
         the congested payoff of the k-th player to arrive. The defining
-        property -- the reason this function and not the welfare sum -- is
+        property, and the reason this function and not the welfare sum, is
         that a unilateral deviation changes the potential by exactly the
         deviator's payoff change, so improving deviations strictly increase
         the potential and local maxima are Nash equilibria. Rosenthal (1973).
@@ -188,7 +188,7 @@ class CongestionGame:
                 )
         return total
 
-    # -- solution concepts -----------------------------------------------------
+    # --- solution concepts -----------------------------------------------------
 
     def best_response_dynamics(
         self,
@@ -197,10 +197,10 @@ class CongestionGame:
     ) -> dict[str, str]:
         """Iterate strict improvements to a pure Nash equilibrium.
 
-        Convergence is guaranteed, not hoped for, and the reason is the
+        Convergence is guaranteed rather than hoped for, and the reason is the
         potential: each applied deviation strictly increases it, the potential
         is bounded above (the floor bounds every term and there are finitely
-        many profiles), so the walk uphill must end. It ends precisely when no
+        many profiles), so the walk uphill must end. It ends when no
         player has a strict improvement left, which is the definition of a
         pure Nash equilibrium. ``max_iters`` is a belt-and-braces bound on the
         number of applied deviations, not part of the guarantee.

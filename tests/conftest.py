@@ -1,6 +1,7 @@
 """Shared fixtures for the end-to-end suite (``tests/test_e2e.py``).
 
-Every fixture here exists to keep the e2e scenarios offline and honest: a
+Every fixture here exists to keep the e2e scenarios offline and free of
+invented data: a
 seeded reference trajectory instead of a live account, a store in ``tmp_path``
 instead of the operator's real history, a ``RecordedClient`` over a fixture
 written into ``tmp_path`` instead of a provider, the dry-run adapter instead
@@ -29,8 +30,8 @@ from fronts.protocols import CodeWorldModel
 
 
 def rotating_publish_policy(model: CodeWorldModel, state: State) -> ActionKey:
-    """A DIFFERENT catalogue publish each day, so a generated history spans
-    more than one archetype and platform -- the shape the cold-start floor
+    """A different catalogue publish each day, so a generated history spans
+    more than one archetype and platform, the shape the cold-start floor
     asks about. Still legal by construction: legality is a precondition on
     planning, so even a dumb policy never proposes an illegal move."""
     legal = model.get_legal_actions(state)
@@ -47,7 +48,7 @@ def reference_trajectory() -> Callable[..., Trajectory]:
 
     A factory rather than a plain trajectory so each scenario picks its own
     horizon (the golden path wants a short cheap episode; a report wants a
-    long one) while keeping the seed fixed -- a history that changed between
+    long one) while keeping the seed fixed: a history that changed between
     runs would make every downstream assertion unrepeatable. The model
     re-stamps each post's utm, so utms are unique and the observation join
     is well posed by construction.
@@ -113,9 +114,9 @@ def _refuse_sockets(*args: object, **kwargs: object) -> None:
 def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make ``socket.socket`` itself raise.
 
-    Not a stub that returns fake data -- an exception whose message names the
-    crime. Any code path that silently reaches for the network fails the test
-    at the exact call site with ``RuntimeError: network access attempted``,
-    which is precisely the failure this fixture exists to make obvious.
+    An exception rather than a stub returning fake data, with a message
+    naming the attempt. Any code path that silently reaches for the network
+    fails the test at the exact call site with ``RuntimeError: network access
+    attempted``, which is the failure this fixture exists to make obvious.
     """
     monkeypatch.setattr("socket.socket", _refuse_sockets)

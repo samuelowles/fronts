@@ -1,14 +1,14 @@
 """Inference as code: the synthesised sampler ISMCTS determinizes with.
 
 ISMCTS needs to sample from the belief over hidden states, and exact
-posterior inference is exponential in the worst case. The paper's move --
-and ours -- is to have the LLM synthesise an approximate sampler instead,
+posterior inference is exponential in the worst case. The paper's move,
+and ours, is to have the LLM synthesise an approximate sampler instead,
 and to establish its correctness structurally rather than probabilistically:
 replaying what it produces through the world model must reproduce every
 observation actually seen.
 
-The guarantee, stated precisely because it is easy to oversell. What
-``validate_history`` buys is SUPPORT MEMBERSHIP, not density. As
+The guarantee is easy to oversell, so it is worth stating carefully. What
+``validate_history`` buys is support membership, not density. As
 ``docs/PAPER.md`` s6 quotes the paper:
 
     "Although this does not guarantee that s_t is correctly distributed, the
@@ -16,13 +16,13 @@ The guarantee, stated precisely because it is easy to oversell. What
      support of state posteriors in games."
 
 In distribution terms: a validated sample gives you ranking weights that
-are not CONTRADICTED by your own results -- weights you can plan against,
+are not contradicted by your own results, weights you can plan against,
 which is strictly more than an operator reasoning by feel has. It does not
 give you the right distribution over ranking weights, and a planner that
-treats one sample as the truth is overconfidence with extra steps.
+treats one sample as the truth is overconfident.
 
 Because we are closed deck, ``resample_state`` is the primary path. The
-paper is candid that it is the weaker variant -- it "cannot guarantee that
+paper is candid that it is the weaker variant: it "cannot guarantee that
 the produced sample belongs to the support of the posterior, nor that it
 constitutes a valid CWM hidden state, because it ignores the dependency
 between consecutive states." We use it anyway because the alternative does
@@ -76,13 +76,13 @@ HISTORY_INFERENCE_CLASS = "HistoryInferenceSampler"
 _STATE_METHODS = {"resample_state": 2}
 _HISTORY_METHODS = {"resample_history": 2}
 
-# Validation runs LOOSER than the generated tests' Tolerance defaults
+# Validation runs looser than the generated tests' Tolerance defaults
 # (counts 0.05 / rates 0.02), and the gap is deliberate. A unit test replays
 # a recorded branch, so a prediction outside test precision is model error;
-# validation replays an INFERRED sample whose claim is support membership,
+# validation replays an inferred sample whose claim is support membership,
 # not density (module docstring), and demanding test-grade precision from a
-# sampler that is approximate by construction would reject every honest
-# sample. Stricter than THIS rejects honest approximations; looser admits
+# sampler that is approximate by construction would reject every legitimate
+# sample. Stricter than this rejects honest approximations; looser admits
 # samples that contradict the data.
 _VALIDATION_TOLERANCE = Tolerance(counts=0.25, rates=0.10)
 
@@ -92,9 +92,9 @@ class FallbackInference:
     """The degenerate sampler: return the model's initial state.
 
     Used when synthesis fails, so a planner degrades to open-loop planning
-    against an uninformative prior instead of crashing -- the reference
-    paper's own fallback behaviour. A planner paired with this is a weaker
-    planner, not a broken one, and the difference is visible in its results
+    against an uninformative prior instead of crashing, the reference
+    paper's own fallback behaviour. A planner paired with this is weaker
+    rather than broken, and the difference is visible in its results
     rather than in a stack trace.
 
     ``model`` is optional: the caller who owns the synthesised CWM passes it
@@ -120,7 +120,7 @@ class FallbackInference:
     ) -> list[ActionKey]:
         # An empty history is the do-nothing sample: no claimed events, so
         # nothing to replay. The planner that consumes it plans from the
-        # prior, which is exactly the degradation intended.
+        # prior, which is the degradation intended.
         return []
 
 
@@ -167,7 +167,7 @@ def _verified_instance(
     source: str, class_name: str, methods: dict[str, int]
 ) -> object | None:
     """Sandbox-load ``source`` and return a verified ``class_name`` instance,
-    or None on any failure -- callers fall back rather than propagate, per
+    or None on any failure; callers fall back rather than propagate, per
     the module contract."""
     try:
         namespace = Sandbox().load(source, SandboxConfig())
@@ -241,11 +241,11 @@ def synthesise_state_inference_source(
     rules: str,
     trajectories: list[Trajectory],
 ) -> str | None:
-    """Synthesise a ``resample_state`` sampler and return its SOURCE.
+    """Synthesise a ``resample_state`` sampler and return its source.
 
     This is what ``fronts synth`` persists beside the world model, so a later
     ``fronts plan`` in a fresh process can sandbox-load the same sampler with
-    ``load_state_inference``. None when synthesis fails -- the caller plans
+    ``load_state_inference``. None when synthesis fails: the caller plans
     open-loop and says so, rather than writing a file that will not load.
     """
     system, user = _inference_prompt(
@@ -270,7 +270,7 @@ def load_state_inference(
 
     None when the source does not load or does not satisfy the protocol; the
     caller chooses its own degradation. ``fronts plan`` degrades to open-loop
-    search against the true state -- NOT ``FallbackInference``, whose
+    search against the true state rather than ``FallbackInference``, whose
     initial-state resample would silently discard the episode's progress.
 
     The returned sampler's ``resample_state`` is wrapped in the in-process
@@ -323,9 +323,9 @@ def validate_history(
     """Replay ``sampled_history`` through ``model`` and confirm every
     recorded observation is reproduced.
 
-    What this guarantees: the sample is in the SUPPORT of the posterior --
-    no recorded observation is contradicted. What it does not: correct
-    DENSITY. The sample need not be at the right place in the posterior,
+    What this guarantees: the sample is in the support of the posterior,
+    so no recorded observation is contradicted. What it does not: correct
+    density. The sample need not be at the right place in the posterior,
     only at a place the data does not rule out (PAPER.md s6). Chance nodes
     are sampled with a fixed seed so the check is deterministic; the seed is
     part of the test, not part of the claim.
@@ -334,7 +334,7 @@ def validate_history(
     replay: the last operator move still has a chance ply after it, and that
     ply is what resolves the final publish into an observation. Breaking on the
     action list at the top of the loop skipped it, so a model asked to validate
-    its OWN recorded history returned False at horizon 10 and True at 6 and 20 --
+    its own recorded history returned False at horizon 10 and True at 6 and 20:
     a bug that looks exactly like a horizon-dependent modelling weakness and is
     an off-by-one. We continue until the model says terminal, or nothing is left
     to resolve.
@@ -403,11 +403,11 @@ def inference_accuracy(
 
     ``mode`` is explicit and required in spirit, because sniffing for a
     ``resample_history`` attribute silently mis-dispatched every sampler that
-    defines both methods -- ``FallbackInference`` among them -- down the history
+    defines both methods (``FallbackInference`` among them) down the history
     path, where its empty sample failed validation immediately and the function
-    returned 0.0 for everything, forever.
+    returned 0.0 for everything.
 
-    The comparison is on METRICS within ``tolerance``, not on identifier
+    The comparison is on metrics within ``tolerance``, not on identifier
     equality. Matching ``utm_content`` only asks whether the reconstructed state
     is pointing at the right post, which any state carrying an empty log fails
     and no state carrying the right log can fail informatively. The question

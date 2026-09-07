@@ -4,17 +4,16 @@ discourage it.
 Why this module is the heart of the game rather than a compliance afterthought:
 ``CodeWorldModel.get_legal_actions`` is the entire interface between a planner
 and the consequences it is allowed to consider. Anything excluded here is a
-mistake the system *cannot make* -- an unsubstantiated health claim, a budget
+mistake the system *cannot make*: an unsubstantiated health claim, a budget
 commitment resting on five conversions, a sixth text thread past the day's
 cadence. Anything merely scored or penalised is a mistake the system can still
-choose under uncertainty, which is exactly the failure mode both corpora
-identify as the way distribution budgets die: premature scaling on thin
-evidence.
+choose under uncertainty. Both corpora identify the same failure mode:
+premature scaling on thin evidence.
 
 So every rule below returns a ``Verdict``, and a gate returns
 ``legal=False`` or it has failed at its only job. No warnings, no scores.
 
-The counts the engine consumes are *settled* counts -- observations still
+The counts the engine consumes are *settled* counts: observations still
 inside the 24-72h reporting lag never open a gate. Build contexts through
 ``settled_count`` so that rule is enforced in one place rather than trusted
 as a convention at every call site.
@@ -120,7 +119,7 @@ _CADENCE_SOURCE = (
 @dataclass(frozen=True, slots=True)
 class Verdict:
     """The result of one rule. Carries its own citation so that any refusal
-    can be answered with the corpus passage that motivates it -- an operator
+    can be answered with the corpus passage that motivates it: an operator
     asked to eat a day of silence is owed the reason, in source form."""
 
     legal: bool
@@ -141,7 +140,7 @@ def _illegal(rule: str, reason: str, source: str) -> Verdict:
 class OperatorPolicy:
     """Tunable thresholds. Defaults are the corpus figures; the knobs exist
     because an operator with different risk tolerance should change policy,
-    not code. ``drawdown_spend_limit`` is the exception -- it is an operator
+    not code. ``drawdown_spend_limit`` is the exception: it is an operator
     risk choice, not a corpus number, and carries no citation for that reason.
 
     The band lower edges (3 text threads/day, the 0.60 acquisition floor) are
@@ -248,8 +247,8 @@ def settled_count(observations: Iterable[Observation]) -> int:
     """Sum conversions over observations the reporting lag has finished with.
 
     The only sanctioned way to derive the counts ``LegalityContext`` consumes.
-    ``is_partial`` observations are dropped entirely -- not prorated, not
-    estimated -- because peeking inside the 24-72h lag is the specific failure
+    ``is_partial`` observations are dropped entirely (not prorated, not
+    estimated), because peeking inside the 24-72h lag is the specific failure
     the gates exist to prevent (DTC 21_Media_Buying_Risk_Management...md).
     """
     return sum(
@@ -265,7 +264,7 @@ class LegalityEngine:
     def __init__(self, policy: OperatorPolicy | None = None) -> None:
         self.policy = policy if policy is not None else OperatorPolicy()
 
-    # -- Public API -----------------------------------------------------------
+    # --- Public API -----------------------------------------------------------
 
     def check(self, move: Move, ctx: LegalityContext) -> Verdict:
         """Return the first failing rule's Verdict, or a legal Verdict."""
@@ -333,7 +332,7 @@ class LegalityEngine:
         """Filter to the moves a planner may select from. Order-preserving."""
         return [move for move in candidates if self.check(move, ctx).legal]
 
-    # -- Evidence gates ---------------------------------------------------
+    # --- Evidence gates ---------------------------------------------------
 
     def _check_creative_judgement(
         self, move: Scale, ctx: LegalityContext
@@ -344,7 +343,7 @@ class LegalityEngine:
         Calling an arc at 5 conversions is the failure the corpus measures
         directly: CPA "frequently explode[s] to $150" on scale-up. This gate
         licenses the creative-level judgement that precedes any spend
-        commitment, so it is checked before -- and independently of -- the
+        commitment, so it is checked before, and independently of, the
         heavier spend gate below.
         """
         settled = ctx.settled_conversions_7d.get(move.angle, 0)
@@ -368,7 +367,7 @@ class LegalityEngine:
         The two thresholds differ because the decisions differ: 50/7d licenses
         saying "this arc works", 300/14d licenses putting money behind it. The
         elapsed-time requirement kills the peeking failure that sample size
-        alone cannot -- a burst of conversions on day 2 is indistinguishable
+        alone cannot: a burst of conversions on day 2 is indistinguishable
         from a trend until the trend has had time to die.
         """
         settled = ctx.settled_conversions_14d.get(move.angle, 0)
@@ -392,19 +391,19 @@ class LegalityEngine:
         return _legal("SPEND_COMMITMENT", _SPEND_COMMITMENT_SOURCE)
 
     def _check_coverage(self, move: Scale | Kill, ctx: LegalityContext) -> Verdict:
-        """Below the attribution floor an angle is UNJUDGEABLE: both Scale
+        """Below the attribution floor an angle is unjudgeable: both Scale
         and Kill are illegal.
 
-        This is deliberately non-obvious and cuts against instinct. Coverage
-        at 0.4 does not make an angle look 40% as good -- it makes the
+        This rule is non-obvious and cuts against instinct. Coverage
+        at 0.4 does not make an angle look 40% as good; it makes the
         *direction* of the estimate unknowable, because what you cannot see is
         not missing at random (ad blockers skew toward the technical, ITP
         toward the affluent). You cannot conclude anything from data you
         mostly cannot see, and Kill is a conclusion just as much as Scale is.
         Killing an angle on unseeable data buries working creative as
         reliably as scaling buries failing creative. The escape is the
-        drawdown rule, which fires on spend -- a number the operator *does*
-        see in full -- rather than on conversions.
+        drawdown rule, which fires on spend (a number the operator *does*
+        see in full) rather than on conversions.
         """
         coverage = ctx.angle_attribution_coverage.get(move.angle, 0.0)
         floor = self.policy.attribution_coverage_floor
@@ -434,9 +433,9 @@ class LegalityEngine:
         scaling and forces the kill decision onto the table.
 
         Drawdown discipline is the one risk rule that must override evidence
-        gates rather than sit beside them: waiting for 300 conversions against
-        an angle that converts nothing is how a drawdown becomes a habit. Note
-        the asymmetry with the coverage rule -- spend is fully observable, so
+        gates rather than sit beside them, because waiting for 300 conversions
+        against an angle that converts nothing just deepens the loss. Note
+        the asymmetry with the coverage rule: spend is fully observable, so
         this conclusion does not depend on the attribution floor.
         """
         if self._drawdown_state(move.angle, ctx):
@@ -450,7 +449,7 @@ class LegalityEngine:
             )
         return _legal("DRAWDOWN", _DRAWDOWN_SOURCE)
 
-    # -- Velocity -----------------------------------------------------------
+    # --- Velocity -----------------------------------------------------------
 
     def _check_velocity(self, move: Scale, ctx: LegalityContext) -> Verdict:
         """Allocation increases are capped at +20% per rolling 48 hours.
@@ -504,14 +503,14 @@ class LegalityEngine:
             )
         return _legal("VELOCITY_48H", _VELOCITY_SOURCE)
 
-    # -- Cadence ------------------------------------------------------------
+    # --- Cadence ------------------------------------------------------------
 
     def _check_format_cap(self, move: Publish, ctx: LegalityContext) -> Verdict:
         """Per-day caps per format.
 
         The caps exist because creative volume is a production constraint
         (GTM 11) and because carpet-bombing one format trains the audience to
-        scroll past it. The band's lower edges -- 3 text threads/day -- are
+        scroll past it. The band's lower edges (3 text threads/day) are
         planning targets and are deliberately not enforced here: no single
         move can be illegal for being insufficient.
         """
@@ -568,14 +567,14 @@ class LegalityEngine:
             )
         return _legal("CADENCE_LANE_SPLIT", _CADENCE_SOURCE)
 
-    # -- Compliance -----------------------------------------------------------
+    # --- Compliance -----------------------------------------------------------
 
     def _check_tracked(self, move: Publish, ctx: LegalityContext) -> Verdict:
         """A Publish with empty utm_content is illegal.
 
         Untracked output cannot produce an ``Observation``, and a move whose
         outcome can never be observed is a move the planner cannot learn
-        from -- it poisons every downstream estimate by being invisible where
+        from: it poisons every downstream estimate by being invisible where
         its consequences land. This is a system invariant rather than a corpus
         finding, so it cites the contract that makes it true.
         """
@@ -596,8 +595,8 @@ class LegalityEngine:
 
         The FTC requires every claim be provable at the moment it is made,
         not provable once results come in. "Substantiated" is a property of
-        the angle, not the post, because a promise is a promise regardless of
-        which creative carries it.
+        the angle, not the post: the same promise rides every creative that
+        carries it.
         """
         if (
             move.claim_class is ClaimClass.OUTCOME_PROMISE
@@ -619,7 +618,7 @@ class LegalityEngine:
         In health contexts an outcome promise is a medical claim, and medical
         claims carry a burden no marketing substantiation can meet. Naming
         how something works makes no promise about what it cures, which is
-        the compliance-safe shape and -- not coincidentally -- the shape with
+        the compliance-safe shape and, not coincidentally, the shape with
         separating power.
         """
         if ctx.health_related and move.claim_class is ClaimClass.OUTCOME_PROMISE:
@@ -636,9 +635,8 @@ class LegalityEngine:
         """A THIRD_PARTY_TESTIMONIAL behind an AI-generated face is illegal.
 
         A testimonial's entire evidentiary value is that a real human chose to
-        stake their reputation on it. A generated face is not a hesitant
-        witness; it is copy wearing a face, and presenting it as a testimonial
-        is the definition of a deceptive endorsement.
+        stake their reputation on it. A generated face stakes nothing, and
+        presenting one as a testimonial is a deceptive endorsement.
         """
         if (
             move.claim_class is ClaimClass.THIRD_PARTY_TESTIMONIAL
@@ -688,8 +686,8 @@ class LegalityEngine:
 
         Named-enemy framing is the highest-CTR mechanic in the corpus and also
         the one platform review rejects: Meta refuses ads that overly
-        disparage a named brand. High reward, irreversible rejection risk --
-        exactly the trade a policy flag exists for, not a default.
+        disparage a named brand. High reward against irreversible rejection
+        risk is the trade a policy flag exists for, not a default.
         """
         if (
             move.claim_class is ClaimClass.COMPARATIVE

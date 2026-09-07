@@ -3,8 +3,8 @@
 Origin: Cowling, Powley and Whitehouse, "Information Set Monte Carlo Tree
 Search", IEEE Transactions on Computational Intelligence and AI in Games 4(3),
 2012. Their problem is ours in miniature: a player who sees only part of the
-state must still commit to one move, and the honest way to do that is to
-search over determinizations -- complete states sampled to be consistent with
+state must still commit to one move, and the standard way to do that is to
+search over determinizations: complete states sampled to be consistent with
 everything the player has actually observed.
 
 Two design decisions are load-bearing enough to state up front.
@@ -26,9 +26,9 @@ logarithm; visits is the denominator.
 
 Where legality depends on hidden state, an action appears in only some
 determinizations and so is playable in only some iterations. Charging it for
-iterations in which it was never an option -- by putting the node's total visit
-count in the logarithm -- inflates its bonus and drives the search toward
-rarely-legal moves. In this domain those are precisely the moves the legality
+iterations in which it was never an option (by putting the node's total visit
+count in the logarithm) inflates its bonus and drives the search toward
+rarely-legal moves. In this domain those are the moves the legality
 engine is refusing, so the bug would push the planner at content it is not
 allowed to ship.
 
@@ -117,7 +117,7 @@ class _Edge:
     ``availability`` is the count that matters. See the module docstring: it is
     incremented every time the action is legal in a determinization passing
     through the node, whether or not it was selected, and it is the term that
-    goes inside the UCT logarithm -- with ``visits`` as the denominator.
+    goes inside the UCT logarithm, with ``visits`` as the denominator.
     """
 
     __slots__ = ("availability", "total_value", "visits")
@@ -132,8 +132,8 @@ class _Node:
     """One information set of the searching player.
 
     Created only at the searching player's decision points, so the node's
-    identity is the sequence of that player's own actions from the root --
-    which is precisely an information set in the tree-form sense.
+    identity is the sequence of that player's own actions from the root,
+    which is an information set in the tree-form sense.
     """
 
     __slots__ = ("children", "edges", "visits")
@@ -226,7 +226,7 @@ class ISMCTS:
         if searched == 0:
             # Every determinization attempt failed even after retries. Cowling
             # et al. degrade to a random legal move here rather than abort the
-            # game; so do we, and for the same reason -- a bad inference
+            # game; so do we, and for the same reason: a bad inference
             # episode must not take the planning loop down with it.
             return MCTSResult(
                 move=rng.choice(root_actions),
@@ -253,7 +253,7 @@ class ISMCTS:
             availability={a: root.edges[a].availability for a in root.edges},
         )
 
-    # -- iteration ---------------------------------------------------------
+    # --- iteration ---------------------------------------------------------
 
     def _run_iteration(
         self,
@@ -330,19 +330,19 @@ class ISMCTS:
     ) -> ActionKey:
         """Pick an action by UCT among children legal in this determinization.
 
-        Selection is restricted to ``legal`` -- the actions legal in the
+        Selection is restricted to ``legal``: the actions legal in the
         determinization being descended, not everything the node has ever
         expanded. Without that restriction an action materialised under one
         determinization gets applied under another where it does not exist,
         and the search quietly plans in worlds that cannot occur.
 
         The exploration term is the one thing ISMCTS changes about UCB1, and it
-        is worth being exact. Cowling, Powley and Whitehouse (2012) select
+        is worth stating carefully. Cowling, Powley and Whitehouse (2012) select
 
             argmax_a [ Q(a) + c * sqrt( ln n'(a) / n(a) ) ]
 
-        where ``n'(a)`` is the AVAILABILITY count -- iterations in which ``a``
-        was legal at this node -- and ``n(a)`` is the visit count, iterations in
+        where ``n'(a)`` is the availability count (iterations in which ``a``
+        was legal at this node) and ``n(a)`` is the visit count, iterations in
         which it was actually played. Availability sits inside the logarithm;
         visits is the denominator.
 
@@ -351,7 +351,7 @@ class ISMCTS:
         substitution matters is that an action legal in only a fraction of
         determinizations should not be charged for iterations in which it was
         never an option. Using the node's total visit count in the logarithm
-        does exactly that, and inflates the bonus on rarely-legal moves until
+        does that, and inflates the bonus on rarely-legal moves until
         the search over-commits to them. Here that would mean systematically
         favouring content the legality engine mostly forbids, which is the
         opposite of the behaviour the gates exist to produce.
@@ -408,7 +408,7 @@ class ISMCTS:
                         break
                     action = rng.choice(legal)
                 rollout_state = model.apply_action(rollout_state, action)
-            # One reading at the end, exactly like the terminal branch above:
+            # One reading at the end, as in the terminal branch above:
             # get_rewards is cumulative-to-date, so summing it per ply would
             # count a reward that settles early up to rollout_depth times.
             total += model.get_rewards(rollout_state).get(player, 0.0)
@@ -435,7 +435,7 @@ class ISMCTS:
         # Floating point shortfall: return the last outcome rather than fail.
         return outcomes[-1][0]
 
-    # -- determinization ---------------------------------------------------
+    # --- determinization ---------------------------------------------------
 
     def _determinize(
         self,
@@ -451,8 +451,7 @@ class ISMCTS:
         ``config.max_resample_retries`` attempts. Without an injected
         ``StateInference`` there is nothing to infer and the caller's state is
         used directly, collapsing the search to plain (perfect-information)
-        UCT -- the honest degradation, since claiming to model hidden state we
-        cannot sample would be worse.
+        UCT rather than pretending to model hidden state it cannot sample.
         """
         if self._inference is None:
             return fallback

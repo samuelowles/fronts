@@ -1,26 +1,24 @@
 """Executing code a language model wrote.
 
-Be honest about what this is and is not.
-
 What the sandbox guarantees: no import statement of any kind reaches the
-interpreter -- every ``import`` and ``from ... import ...`` is refused at
-compile time, by walking the AST BEFORE any of the source executes -- and the
+interpreter (every ``import`` and ``from ... import ...`` is refused at
+compile time, by walking the AST before any of the source executes), and the
 namespace a module runs in contains no module objects at all, only
 pre-bound functions, classes and constants (see ``default_namespace``). A
 module object is a pointer into the whole importable graph, because
 allowlisted modules re-export dangerous ones as ordinary attributes
-(``random._os`` is ``os``); refusing modules as VALUES, not just as imports,
+(``random._os`` is ``os``); refusing modules as values, not just as imports,
 is what closes that class of escape. On top of that, the AST walk refuses
 ``open``/``exec``/``eval``/``compile``, dunder attribute access,
 ``__subclasses__``/``__globals__``/``__code__``, and the builtins the module
 sees are an explicit allowlist. Module-level code and every call through
 ``Sandbox.guarded`` run under ``call_with_timeout``.
 
-What it does NOT guarantee: this is still the same interpreter, in the same
+What it does not guarantee: this is still the same interpreter, in the same
 process, with the same memory. A determined adversary who finds a way to
 mutate an object the sandbox handed it, or to spin a thread the timeout
-cannot abandon, is out of scope -- the timeout protects the caller's control
-flow, not the process. Anyone running genuinely untrusted synthesis output
+cannot abandon, is out of scope: the timeout protects the caller's control
+flow, not the process. Anyone running synthesis output they do not trust
 should use ``SubprocessSandbox`` (a real process boundary with a hard kill)
 or, better, a container, and accept the per-call IPC cost that makes the
 subprocess variant unsuitable for an inner MCTS loop.
@@ -69,8 +67,8 @@ __all__ = [
 class SandboxConfig:
     """Knobs for one sandboxed execution.
 
-    ``namespace_extras`` adds or overrides pre-bound VALUES (never modules)
-    in the namespace the source runs in -- a caller with a richer vocabulary
+    ``namespace_extras`` adds or overrides pre-bound values (never modules)
+    in the namespace the source runs in: a caller with a richer vocabulary
     for its models extends the sandbox here rather than reopening imports.
     """
 
@@ -90,7 +88,7 @@ class SandboxTimeout(Exception):
 
 
 # Names whose mere appearance is refused, called or not: aliasing ``open`` to
-# a variable and calling it later is the same request with extra steps.
+# a variable and calling it later makes the same request indirectly.
 FORBIDDEN_NAMES: frozenset[str] = frozenset(
     {"open", "exec", "eval", "compile", "__import__", "input", "breakpoint"}
 )
@@ -104,7 +102,7 @@ never share a stream."""
 
 def default_namespace(extras: dict[str, object] | None = None) -> dict[str, object]:
     """The values a sandboxed module starts with: functions, classes and
-    constants, and NOT ONE module object.
+    constants, and no module objects.
 
     This is the replacement for the module allowlist, and the reason it
     works where the allowlist could not: ``math.sqrt`` is a function with no
@@ -170,7 +168,7 @@ class _ForbiddenVisitor(ast.NodeVisitor):
         listed = ", ".join(f"`{name}`" for name in self.bound)
         return (
             f"imports are not available in the sandbox; {listed} are already "
-            "bound -- use those names directly, and write everything else "
+            "bound. Use those names directly, and write everything else "
             "yourself"
         )
 
@@ -217,9 +215,9 @@ class _CappedBuffer(io.StringIO):
     prints its way through the memory budget fails loudly instead of
     quietly.
 
-    The cap counts UTF-8 BYTES, matching the ``max_output_bytes`` name:
+    The cap counts UTF-8 bytes, matching the ``max_output_bytes`` name:
     ``StringIO.tell()`` counts characters, and a model printing emoji or CJK
-    text gets several bytes per character -- a character-counted cap would
+    text gets several bytes per character, so a character-counted cap would
     quietly admit multiples of the budget the config names."""
 
     def __init__(self, cap: int) -> None:
@@ -241,7 +239,7 @@ class _CappedBuffer(io.StringIO):
 def _safe_builtins() -> dict[str, object]:
     """The builtins a world model legitimately needs and nothing else.
 
-    There is deliberately NO ``__import__`` here, not even a refusing one:
+    There is deliberately no ``__import__`` here, not even a refusing one:
     imports are refused at compile time and nothing executable ever asks the
     import machinery for anything. ``__build_class__`` and ``__name__`` have
     to be present or ``class`` statements fail; they are injected by the
@@ -274,7 +272,7 @@ class Sandbox:
     def load(self, source: str, config: SandboxConfig) -> types.ModuleType:
         """Return the module namespace produced by executing ``source``.
 
-        The AST is walked BEFORE compilation of the bytecode that will run:
+        The AST is walked before compilation of the bytecode that will run:
         refusing at compile time is the whole point, because a check at
         execution time has already let the offending construct run partway.
         The ``exec`` itself runs under ``call_with_timeout``, so a module
@@ -286,7 +284,7 @@ class Sandbox:
 
         # A unique name, and temporary registration in sys.modules, because
         # the dataclasses machinery resolves string annotations by looking
-        # the defining module up there -- an unregistered module breaks
+        # the defining module up there: an unregistered module breaks
         # ``@dataclass`` in the synthesised code. The entry is removed in a
         # ``finally`` so 500 refinement calls do not leave 500 dead modules
         # in sys.modules.
@@ -299,9 +297,9 @@ class Sandbox:
         code = compile(source, "<cwm_sandbox>", "exec")
 
         def run() -> None:
-            exec(code, module.__dict__)  # noqa: S102 - the sandbox IS the point
+            exec(code, module.__dict__)  # noqa: S102 - this module exists to run untrusted code
 
-        # The redirect is installed on the CALLER's thread, not inside the
+        # The redirect is installed on the caller's thread, not inside the
         # worker: a timed-out worker is abandoned mid-``with`` and would
         # otherwise leave stdout pointed at a dead buffer forever. stdout and
         # stderr both flow through the cap. stdin needs no redirection:
@@ -324,11 +322,11 @@ class Sandbox:
 
         The load-time timeout only covers module top-level code; a hang
         inside ``apply_action`` wedges whoever called it. Wrapping converts
-        that hang into a ``SandboxTimeout`` the caller can act on -- at the
-        price of one worker thread PER CALL, which is why the shipped
-        planning loop does NOT use it: ISMCTS makes ~10^5 model calls per
+        that hang into a ``SandboxTimeout`` the caller can act on, at the
+        price of one worker thread per call, which is why the shipped
+        planning loop does not use it: ISMCTS makes ~10^5 model calls per
         plan, and a thread each would dominate the runtime. Wrap when call
-        volume is low or trust is lower still; for genuinely hostile source,
+        volume is low or trust is lower still; for hostile source,
         ``SubprocessSandbox`` is the wall (SECURITY.md).
         """
         return guard_methods(model, CWM_METHOD_PARAMS, timeout)  # type: ignore[return-value]
@@ -339,7 +337,7 @@ class _GuardedProxy:
 
     Only the named methods exist on the proxy: an ``__getattr__`` that
     answered every name would make ``hasattr``-based protocol checks
-    meaningless, which is exactly what ``check_protocol_methods`` and
+    meaningless, which is what ``check_protocol_methods`` and
     ``isinstance`` against the runtime-checkable protocols rely on.
     """
 
@@ -361,8 +359,8 @@ class _GuardedProxy:
 def guard_methods(
     obj: object, method_names: Iterable[str], timeout: float
 ) -> object:
-    """``Sandbox.guarded`` for objects that are not world models -- inference
-    samplers, value functions -- wrapping each named method in
+    """``Sandbox.guarded`` for objects that are not world models (inference
+    samplers, value functions), wrapping each named method in
     ``call_with_timeout``."""
     return _GuardedProxy(obj, method_names, timeout)
 
@@ -375,12 +373,12 @@ def call_with_timeout(
     """Run ``fn(*args)`` in a worker thread; raise ``SandboxTimeout`` on
     overrun.
 
-    The honest limitation, stated plainly because a timeout that oversells
-    itself is worse than none: a Python thread cannot be force-killed. If the
+    One limitation, because a timeout that oversells itself is worse than
+    none: a Python thread cannot be force-killed. If the
     function hard-spins, the thread leaks and keeps burning CPU until the
-    process exits -- the worker is created as a daemon so the interpreter can
+    process exits. The worker is created as a daemon so the interpreter can
     still shut down, but until then the leak is real. This timeout protects
-    the CALLER'S control flow (the synthesis loop gets to give up, report,
+    the caller's control flow (the synthesis loop gets to give up, report,
     and try a different candidate); it does not protect the process from the
     code it ran. Only a process boundary does that.
     """
@@ -429,8 +427,8 @@ def check_protocol_methods(
     """Return a list of human-readable problems, empty when ``obj`` satisfies
     the given (method -> positional arity) table.
 
-    Arity is checked by whether the method can ACCEPT the required positional
-    arguments (defaults and ``*args`` are fine) rather than by exact count --
+    Arity is checked by whether the method can accept the required positional
+    arguments (defaults and ``*args`` are fine) rather than by exact count:
     a model adding an optional parameter is harmless and refusing it would
     waste a refinement round on a non-problem.
     """
@@ -473,10 +471,10 @@ def instantiate(namespace: types.ModuleType, class_name: str) -> CodeWorldModel:
     """Find ``class_name`` in a sandboxed namespace, construct it, and verify
     it structurally satisfies ``CodeWorldModel``.
 
-    Raises ``ProtocolViolation`` listing EVERY missing or mis-signatured
-    method -- all at once, because the failing method list is the refinement
-    prompt's most useful content and dribbling it out one method per
-    synthesis round is how call budgets die. The final ``isinstance`` check
+    Raises ``ProtocolViolation`` listing every missing or mis-signatured
+    method, all at once, because the failing method list is the refinement
+    prompt's most useful content and issuing it one method per synthesis
+    round would multiply the calls spent. The final ``isinstance`` check
     is the same claim restated for the type checker: after the arity table
     has passed, the instance must also satisfy the runtime-checkable
     protocol itself.
@@ -508,12 +506,12 @@ def instantiate(namespace: types.ModuleType, class_name: str) -> CodeWorldModel:
 # Subprocess sandbox.
 #
 # The in-process sandbox raises the cost of an accident; it is not a wall,
-# and its own docstring says so. This class IS a wall -- or at least a real
-# process boundary with a hard kill -- at the price of one inter-process
-# round trip per METHOD CALL, which is why nothing in the planning loop uses
+# and its own docstring says so. This class is a wall (or at least a real
+# process boundary with a hard kill) at the price of one inter-process
+# round trip per method call, which is why nothing in the planning loop uses
 # it: an ISMCTS search that makes hundreds of thousands of CWM calls would
-# spend its entire budget on pipes. Use it when the source is genuinely
-# untrusted and rare calls are acceptable.
+# spend its entire budget on pipes. Use it when the source is untrusted
+# and rare calls are acceptable.
 # ---------------------------------------------------------------------------
 
 
@@ -758,14 +756,14 @@ class _RemoteClass:
 
 
 class SubprocessSandbox:
-    """Load and call synthesised code in a SEPARATE process, killed on
+    """Load and call synthesised code in a separate process, killed on
     timeout.
 
-    This is the option for genuinely untrusted source: the child runs
+    This is the option for source you do not trust: the child runs
     ``python -c`` with the same no-imports namespace rules, every exchange is
-    JSON over stdin/stdout, and an overrun gets a real ``kill()`` -- not the
+    JSON over stdin/stdout, and an overrun gets a real ``kill()``, not the
     abandoned thread the in-process timeout settles for. The price is one
-    pipe round trip per METHOD CALL, which is why it is unsuitable for the
+    pipe round trip per method call, which is why it is unsuitable for the
     inner MCTS loop: use ``Sandbox`` there, and this when the source has no
     business sharing your interpreter.
 
@@ -816,7 +814,7 @@ class SubprocessSandbox:
             },
             # Interpreter startup is environment cost, not model code: on a
             # cold Windows box it alone can exceed a sub-second call budget.
-            # The kill guarantee stands -- the load budget is larger, not gone.
+            # The kill guarantee stands; the load budget is larger, not gone.
             timeout=config.timeout_seconds + _CHILD_STARTUP_GRACE_SECONDS,
         )
         if not reply.get("ok"):
@@ -874,7 +872,7 @@ class SubprocessSandbox:
             self.close()
             raise SandboxViolation(f"child process exited before replying: {detail}")
         reply = _revive(json.loads(line))
-        # The protocol is one JSON OBJECT per line; anything else means the
+        # The protocol is one JSON object per line; anything else means the
         # child is misbehaving or dead, and handing an unvalidated value back
         # would move the failure into whichever caller unpacks it next.
         if not isinstance(reply, dict):

@@ -1,7 +1,7 @@
 """Names exported in ``__all__`` that no other module or test exercises.
 
-Every test here exists because a name is public API -- an operator or a
-downstream caller is invited to use it -- yet nothing in the repository
+Every test here exists because a name is public API (an operator or a
+downstream caller is invited to use it), yet nothing in the repository
 touched it. Shipping that is how an export rots: a refactor breaks it and
 no suite notices. The heaviest case is deliberate: ``SubprocessSandbox`` is
 the option SECURITY.md tells readers to reach for with untrusted source,
@@ -80,7 +80,7 @@ from fronts.game.types import (
 from fronts.solvers.signalling import SignalCost, SignallingConfig, separating_power
 
 # ---------------------------------------------------------------------------
-# SubprocessSandbox -- the SECURITY.md option, previously shipped untested.
+# SubprocessSandbox, the SECURITY.md option, previously shipped untested.
 # ---------------------------------------------------------------------------
 
 SUBPROCESS_MODEL_SOURCE = '''\
@@ -125,7 +125,7 @@ def test_subprocess_sandbox_loads_and_calls_a_valid_module() -> None:
     try:
         namespace = sandbox.load(SUBPROCESS_MODEL_SOURCE, SandboxConfig())
         model = namespace.WorldModel()
-        # The reply crosses JSON, so dict keys arrive as strings -- the
+        # The reply crosses JSON, so dict keys arrive as strings, the
         # documented shape of everything that comes back from the child.
         assert model.get_rewards({"day": 0}) == {"0": 1.0}
         assert model.get_legal_actions({"day": 0}) == ["hold"]
@@ -140,7 +140,7 @@ def test_subprocess_sandbox_loads_and_calls_a_valid_module() -> None:
 def test_subprocess_sandbox_kills_a_runaway_child_on_timeout() -> None:
     """The whole point of the class: an overrun gets a real kill(), not the
     abandoned thread the in-process timeout settles for. ``process`` is
-    exposed precisely so this can be asserted rather than trusted."""
+    exposed so this can be asserted rather than trusted."""
     sandbox = SubprocessSandbox()
     source = SUBPROCESS_MODEL_SOURCE.replace(
         "    def get_rewards(self, state):\n        return {0: 1.0}",
@@ -153,7 +153,7 @@ def test_subprocess_sandbox_kills_a_runaway_child_on_timeout() -> None:
         assert sandbox.process is not None
         with pytest.raises(SandboxTimeout, match="killed"):
             model.get_rewards({"day": 0})
-        # KILLED, not abandoned: the child is gone.
+        # Killed, not abandoned: the child is gone.
         assert sandbox.process.poll() is not None
     finally:
         sandbox.close()
@@ -202,7 +202,7 @@ def test_output_cap_counts_bytes_not_characters() -> None:
 
 
 # ---------------------------------------------------------------------------
-# guard_methods -- Sandbox.guarded for non-world-model objects.
+# guard_methods, Sandbox.guarded for non-world-model objects.
 # ---------------------------------------------------------------------------
 
 
@@ -471,8 +471,8 @@ def test_signalling_config_guards_the_zero_denominator() -> None:
 
 
 def test_operator_policy_defaults_are_the_corpus_gates() -> None:
-    """The two corpus gates -- 50/7d creative judgement, 300/14d spend
-    commitment (``fronts.game.types``, "Evidence gates") -- are what
+    """The two corpus gates, 50/7d creative judgement and 300/14d spend
+    commitment (``fronts.game.types``, "Evidence gates"), are what
     ``OperatorPolicy`` enforces by default; this pins the numbers so a
     tuning edit has to be deliberate, not a drive-by."""
     policy = OperatorPolicy()
@@ -509,7 +509,7 @@ def test_the_lane_split_covers_every_cta_exactly_once() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Prior row types -- the schema of the public tables.
+# Prior row types, the schema of the public tables.
 # ---------------------------------------------------------------------------
 
 

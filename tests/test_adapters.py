@@ -1,10 +1,10 @@
 """Unit tests for the adapter layer: Composio I/O and the trajectory store.
 
 The adapter is where the system meets the outside world, so the tests here
-are mostly about REFUSAL and SURVIVAL rather than happy paths: no SDK import
+are mostly about refusal and survival rather than happy paths: no SDK import
 without a live call, no I/O in a dry run, no guessed attribution numbers, no
 half-written history after a crash. An adapter that is wrong in any of these
-ways does not fail loudly -- it poisons quietly, which is worse.
+ways poisons quietly rather than failing loudly, which is worse.
 """
 
 from __future__ import annotations
@@ -102,8 +102,8 @@ def _observation(**overrides: object) -> Observation:
 
 
 def test_importing_every_fronts_module_never_imports_the_sdk() -> None:
-    """The core must import on a machine with no composio SDK installed --
-    importing every module in the package IS the check."""
+    """The core must import on a machine with no composio SDK installed:
+    importing every module in the package is the check."""
     import fronts
 
     sys.modules.pop("composio", None)
@@ -144,8 +144,8 @@ def test_sdk_import_is_inside_execute_not_at_module_scope() -> None:
 
 
 class _FakeExecuteResponse:
-    """Mimics an SDK result object: not a dict, exposes .data -- exactly the
-    shape _as_dict exists to normalise."""
+    """Mimics an SDK result object: not a dict, exposes .data, the shape
+    _as_dict exists to normalise."""
 
     def __init__(self, data: dict) -> None:
         self.data = data
@@ -541,7 +541,7 @@ def test_moves_round_trip_through_the_store(tmp_path: Path) -> None:
 
 def test_chance_survives_save_and_load(tmp_path: Path) -> None:
     """Losing the recorded chance sequence turns every transition test into
-    a coin flip -- the reference model scored 0.20 against its own
+    a coin flip: the reference model scored 0.20 against its own
     trajectories when replay re-rolled the dice."""
     store = TrajectoryStore(tmp_path / "t.jsonl")
     original = _trajectory_with_moves()
@@ -615,7 +615,7 @@ def test_crash_before_replace_leaves_previous_file_intact(
 
 
 def test_truncated_final_line_is_skipped(tmp_path: Path) -> None:
-    """A crash mid-APPEND leaves a cut line at the end; the reader skips
+    """A crash mid-append leaves a cut line at the end; the reader skips
     exactly that line and keeps everything before it."""
     store = TrajectoryStore(tmp_path / "t.jsonl")
     store.append_move(_publish(utm_content="c0412ab9"), posted_at="2026-08-01")

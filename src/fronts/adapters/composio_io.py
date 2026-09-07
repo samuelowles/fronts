@@ -1,21 +1,21 @@
 """Platform I/O through Composio's unified API, and nothing else.
 
-THE DESIGN RULE, and the reason this module exists in this shape: every call
-into Composio goes through ONE private method, ``_execute``. Nothing else in
-this codebase may touch the SDK -- not the CLI, not the trajectory store, not
-a test, not another adapter. Tool slugs drift between provider versions and
-between Composio releases; when one renames ``TWITTER_CREATION_OF_A_POST``
-out from under us, a single chokepoint makes that a one-line fix inside one
-method, instead of archaeology across every call site that ever posted. If
-you are adding a second entry point into the SDK, you are undoing the module.
+The design rule, and the reason this module exists in this shape: every call
+into Composio goes through one private method, ``_execute``. Nothing else in
+this codebase may touch the SDK, whether CLI, trajectory store, test, or
+another adapter. Tool slugs drift between provider versions and between
+Composio releases; when one renames ``TWITTER_CREATION_OF_A_POST`` out from
+under us, a single chokepoint makes that a one-line fix inside one method,
+instead of archaeology across every call site that ever posted. If you are
+adding a second entry point into the SDK, you are undoing the module.
 
 The SDK is imported lazily, inside ``_execute``, for the same reason the LLM
 clients in ``fronts.cwm.llm`` import lazily: the core must import and run on
 a machine with no network and no extras installed, and an adapter that
-breaks ``import fronts`` when ``composio`` is absent is an adapter nobody
-can test offline.
+breaks ``import fronts`` when ``composio`` is absent cannot be tested
+offline.
 
-Verified SDK surface (everything beyond this is UNVERIFIED, see
+Verified SDK surface (everything beyond this is unverified, see
 ``ToolkitRegistry``)::
 
     from composio import Composio
@@ -25,9 +25,9 @@ Verified SDK surface (everything beyond this is UNVERIFIED, see
 Two things this module refuses to do, on principle rather than by omission:
 
 * It does not guess attribution coverage or incrementality. No platform API
-  can measure either -- coverage is a property of the operator's tracking
-  stack and incrementality of their holdout tests -- so both arrive as
-  operator-supplied measurements and an ``Observation`` is refused (never
+  can measure either: coverage is a property of the operator's tracking
+  stack and incrementality of their holdout tests. Both arrive as
+  operator-supplied measurements, and an ``Observation`` is refused (never
   defaulted) while they are unset. See ``MissingMeasurementError``.
 * It never retries a publish. A retried read costs a round trip; a retried
   publish that had in fact landed is a duplicate post, which is an
@@ -50,10 +50,10 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 try:  # Python 3.11+: the canonical spelling, and what ruff's target expects.
     from datetime import UTC
 except ImportError:  # Python 3.10, which contributors run despite the floor
-    # in pyproject -- the same accommodation the UP042 ignore documents.
+    # in pyproject, the same accommodation the UP042 ignore documents.
     from datetime import timezone
 
-    UTC = timezone.utc  # noqa: UP017 -- this module must import on 3.10 too
+    UTC = timezone.utc  # noqa: UP017 - this module must import on 3.10 too
 
 from fronts.game.priors import REPORTING_LAG_HOURS
 from fronts.game.types import Observation, Platform, Publish
@@ -73,12 +73,12 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 _REPORTING_LAG = timedelta(hours=REPORTING_LAG_HOURS.high)
-"""How long an observation stays partial. The HIGH end of the measured
+"""How long an observation stays partial. The high end of the measured
 24-72h band is the conservative reading: an observation is treated as
 provisional until the longest measured lag has cleared, because peeking
 inside the window is the specific failure the evidence gates exist to
-prevent -- an observation marked settled one hour early can open a gate
-that 49-conversion rule was closing."""
+prevent. An observation marked settled one hour early can open a gate that
+the 49-conversion rule was closing."""
 
 _BACKOFF_BASE_SECONDS = 0.5
 """Base for exponential backoff. Small because the first retry should be
@@ -86,7 +86,7 @@ near-immediate and each subsequent one doubles; a caller waiting through
 three retries on a dead connection spends ~3.5s total, which is inside any
 reasonable operator patience and outside any reasonable thundering-herd."""
 
-# Substrings matched against the LOWERCASED exception text (and class name)
+# Substrings matched against the lowercased exception text (and class name)
 # to decide transient-vs-fatal. Deliberately conservative: anything not
 # recognisably transient is treated as fatal, because a wrong retry on a
 # non-idempotent call is worse than a slow failure on an idempotent one.
@@ -111,18 +111,18 @@ class MissingMeasurementError(RuntimeError):
     Attribution coverage and incrementality are properties of the operator's
     tracking stack and holdout tests respectively. Defaulting either to 1.0
     would silently re-base every reward the model ever learns on the
-    assumption that the dashboard sees everything and causes everything --
-    the exact confident-direction error docs/OPERATING.md opens with. The
-    message points there deliberately.
+    assumption that the dashboard sees everything and causes everything:
+    the confident-direction error docs/OPERATING.md opens with. The message
+    points there deliberately.
     """
 
 
 def stamp_utm(url: str, utm_content: str) -> str:
     """Return ``url`` with ``utm_content`` set to ``utm_content`` in its query.
 
-    The utm id is the ONLY join key between a move and the observation that
+    The utm id is the only join key between a move and the observation that
     arrives days later (``Publish.utm_content``), so it is stamped at the
-    last moment before the call leaves the process -- here, where nothing
+    last moment before the call leaves the process: here, where nothing
     downstream can forget it. An existing ``utm_content`` parameter is
     replaced rather than duplicated (two values for one key is undefined by
     the analytics tools that read it); every other parameter is preserved in
@@ -144,7 +144,7 @@ def _require_measurements(
     """Refuse to build an Observation without both operator measurements,
     returning the two values now known not to be ``None``.
 
-    This check runs BEFORE any network call, so a misconfigured operator
+    This check runs before any network call, so a misconfigured operator
     learns it at ingest time rather than after a round of API calls whose
     results could not be used anyway. Returning the pair (rather than
     ``None``) is what lets callers treat the check as the proof of
@@ -161,7 +161,7 @@ def _require_measurements(
         ]
         raise MissingMeasurementError(
             f"cannot build an Observation: {', '.join(missing)} is unset. "
-            "Neither is measurable from a platform API -- coverage is a "
+            "Neither is measurable from a platform API: coverage is a "
             "property of your tracking stack, incrementality of your holdout "
             "tests. Measure them (a holdout, or a post-purchase survey "
             "reconciled against analytics for a month) and set them under "
@@ -176,9 +176,9 @@ def _parse_timestamp(raw: str | datetime) -> datetime:
     """Parse an ISO timestamp into aware UTC.
 
     Accepts date-only strings (what the game layer records) and naive
-    datetimes (treated as UTC) so comparisons never mix aware and naive --
-    which raises rather than compares, and would surface as a mysterious
-    ingest failure instead of a timezone bug.
+    datetimes (treated as UTC) so comparisons never mix aware and naive
+    (mixing them raises rather than compares, and would surface as a
+    mysterious ingest failure instead of a timezone bug).
     """
     moment = raw if isinstance(raw, datetime) else datetime.fromisoformat(raw)
     if moment.tzinfo is None:
@@ -209,7 +209,7 @@ def _is_transient(exc: Exception) -> bool:
 class ComposioConfig:
     """Connection settings for the Composio adapter.
 
-    ``slug_overrides`` exists because the registry below is UNVERIFIED
+    ``slug_overrides`` exists because the registry below is unverified
     against a live account: when a real slug turns out to differ, the fix is
     a config entry (``{"publish:x": "X_CREATE_POST"}``), not a code change
     and a release. Keys are ``"<kind>:<platform value>"`` with kind one of
@@ -239,12 +239,12 @@ class ToolkitEntry:
 class ToolkitRegistry:
     """Platform -> Composio toolkit and action slugs.
 
-    UNVERIFIED AGAINST A LIVE ACCOUNT. The names below are the author's best
+    UNVERIFIED against a live account. The names below are the author's best
     reading of Composio's naming conventions (``TWITTER_CREATION_OF_A_POST``
     is the convention every slug follows), written offline with no network
     and no connected account to check against. A confidently wrong slug is
-    worse than a flagged one -- it fails at publish time with a provider
-    error an operator will misread as a permissions problem -- so treat this
+    worse than a flagged one: it fails at publish time with a provider
+    error an operator will misread as a permissions problem. Treat this
     table as a hypothesis to confirm on first live use, and correct via
     ``ComposioConfig.slug_overrides`` rather than by editing this class.
     Every slug is overridable; nothing here is load-bearing once a config
@@ -297,7 +297,7 @@ class ToolkitRegistry:
         """Resolve one platform's slugs, applying ``overrides`` last.
 
         Override keys are ``publish:<platform.value>`` and
-        ``analytics:<platform.value>`` -- the toolkit name is Composio's and
+        ``analytics:<platform.value>``. The toolkit name is Composio's and
         slugs already encode it, so overriding the toolkit separately would
         be a third way to say the same thing.
         """
@@ -313,7 +313,7 @@ class ToolkitRegistry:
 class PublishReceipt:
     """What came back from one publish attempt.
 
-    ``url`` is the destination AFTER utm stamping, so the receipt is itself
+    ``url`` is the destination after utm stamping, so the receipt is itself
     the record of which join key the post carries: if the observation never
     arrives, the receipt is where you check whether the stamp was there.
     """
@@ -332,8 +332,8 @@ def _as_dict(result: Any) -> dict[str, Any]:
     The verified surface says only that ``tools.execute`` returns a result;
     Composio's client has historically returned response objects exposing
     ``.data`` or ``.to_dict()``. Anything dict-shaped or convertible is
-    accepted, anything else fails loudly rather than being stringified --
-    a metrics payload parsed out of a repr is worse than no payload.
+    accepted, anything else fails loudly rather than being stringified,
+    because a metrics payload parsed out of a repr is worse than no payload.
     """
     if isinstance(result, dict):
         return result
@@ -364,10 +364,9 @@ def observation_from_metrics(
     Metric keys are the ``Observation`` field names; missing keys read as
     zero rather than raising, because platform analytics endpoints return
     sparse objects (a text post has no hold rate) and a missing metric is
-    genuinely absent data, not a malformed response. The two fields that are
-    NOT metrics -- coverage and incrementality -- come only from the
-    operator's measurements and refuse to be guessed
-    (``MissingMeasurementError``).
+    absent data, not a malformed response. The two fields that are not
+    metrics, coverage and incrementality, come only from the operator's
+    measurements and refuse to be guessed (``MissingMeasurementError``).
 
     ``is_partial`` is set from the elapsed time between ``posted_at`` and
     ``now`` against the measured reporting lag's high end; see
@@ -402,10 +401,10 @@ class ComposioAdapter:
 
     The two operator measurements (``attribution_coverage``,
     ``incrementality``) are constructor arguments rather than derived from
-    anything, because they cannot be derived from anything -- see
-    ``MissingMeasurementError``. ``None`` (the default) keeps the adapter
-    honest: it will publish, but ``fetch_analytics`` will refuse rather
-    than emit observations denominated in guessed coverage.
+    anything, because they cannot be derived from anything (see
+    ``MissingMeasurementError``). With ``None`` (the default) the adapter
+    will still publish, but ``fetch_analytics`` will refuse rather than
+    emit observations denominated in guessed coverage.
     """
 
     def __init__(
@@ -421,7 +420,7 @@ class ComposioAdapter:
         self.registry = registry if registry is not None else ToolkitRegistry()
         self._client: Any | None = None
 
-    # -- the chokepoint -----------------------------------------------------
+    # --- the chokepoint ----------------------------------------------------
 
     def _execute(
         self,
@@ -430,14 +429,14 @@ class ComposioAdapter:
         *,
         retryable: bool = True,
     ) -> dict[str, Any]:
-        """Execute one Composio tool call. The ONLY SDK entry point.
+        """Execute one Composio tool call. The only SDK entry point.
 
-        Every platform interaction this package performs -- publish,
-        analytics, anything added later -- passes through here, so SDK
+        Every platform interaction this package performs (publish,
+        analytics, anything added later) passes through here, so SDK
         version drift, credential resolution, and retry policy each have
-        exactly one implementation and one place to fix.
+        one implementation and one place to fix.
 
-        Retries: exponential backoff on transient failure, but ONLY when
+        Retries: exponential backoff on transient failure, but only when
         ``retryable``. Reads pass ``retryable=True`` (a duplicate read is
         free); ``publish`` passes False, because once a request has left the
         process an exception tells us nothing about whether the platform
@@ -485,21 +484,22 @@ class ComposioAdapter:
         # Unreachable: the loop returns or raises on its final attempt.
         raise RuntimeError(f"retry loop exited without a result on {slug!r}")
 
-    # -- public interface ----------------------------------------------------
+    # --- public interface ---------------------------------------------------
 
     def publish(self, move: Publish, content: Mapping[str, Any]) -> PublishReceipt:
         """Post one ``Publish`` move, its utm id stamped into the link.
 
         ``content`` is a brief as emitted by ``fronts brief``: free-form
         fields plus ``"url"``, the destination the utm is stamped into. Only
-        ``Publish`` is postable -- a Scale commits budget, it does not ship
-        an asset -- so anything else is a TypeError rather than a
-        best-effort post of the wrong thing.
+        ``Publish`` is postable (a Scale commits budget and ships no asset),
+        so anything else is a TypeError rather than a best-effort post of
+        the wrong thing.
 
-        NOT RETRIED, at any failure, ever (see ``_execute``): a timeout may
-        mean the post landed and the response was lost, and two posts under
-        one utm id would collapse into one row of analytics -- silently
-        merging the learning of two distinct creatives.
+        This method is never retried, whatever the failure (see
+        ``_execute``): a timeout may mean the post landed and the response
+        was lost, and two posts under one utm id would collapse into one
+        row of analytics, silently merging the learning of two distinct
+        creatives.
         """
         if not isinstance(move, Publish):
             raise TypeError(f"publish posts Publish moves, not {type(move).__name__}")
@@ -535,13 +535,13 @@ class ComposioAdapter:
 
         ``platforms`` maps utm id -> the platform it was posted to. The live
         API is organised by toolkit, so without it the adapter cannot know
-        which analytics slug owns a given id -- and guessing a toolkit is
-        the same class of error as guessing a slug. The caller who owns the
+        which analytics slug owns a given id. Guessing a toolkit is the
+        same class of error as guessing a slug. The caller who owns the
         trajectory store owns this mapping; a missing map (or a missing
         entry) is a ValueError rather than a query against the wrong
         platform. ``RecordedAdapter`` ignores the mapping entirely.
 
-        Fresh observations -- inside the measured reporting lag -- are
+        Fresh observations, those inside the measured reporting lag, are
         returned with ``is_partial=True`` so the evidence gates can refuse
         them; the reference model and the legality engine agree that a
         partial observation may be read but must not open a gate.
@@ -559,7 +559,7 @@ class ComposioAdapter:
             if utm not in platforms:
                 raise ValueError(
                     f"no platform known for utm {utm!r}; pass platforms= from "
-                    "the trajectory store -- the toolkit cannot be guessed"
+                    "the trajectory store, because the toolkit cannot be guessed"
                 )
             platform = platforms[utm]
             entry = self.registry.entry(platform, self.config.slug_overrides)
@@ -585,11 +585,11 @@ class ComposioAdapter:
 class DryRunAdapter:
     """Same interface as ``ComposioAdapter``, zero I/O.
 
-    The CLI's default: an operator should be able to see exactly what WOULD
-    be posted, under which slugs, with which utm stamps, before any
+    The CLI's default: an operator should be able to see what would be
+    posted, under which slugs, with which utm stamps, before any
     credential exists. Intended calls are recorded in ``calls`` (machine)
     and logged (human); ``fetch_analytics`` returns an empty list because a
-    dry run has no data and must not invent any -- fabricating plausible
+    dry run has no data and must not invent any: fabricating plausible
     metrics here would be the single easiest way to train a model on
     fiction.
     """
@@ -657,8 +657,8 @@ class RecordedAdapter:
     ``fronts.cwm.llm``: a recorded response carries the shape a live one
     actually had, which a mock asserts only what its author believed. Each
     fixture line is ``{"utm_content": ..., "response": {...}}``; a utm with
-    no recorded entry is SKIPPED rather than synthesised, so a fixture that
-    stops mid-history reads as "no data yet" -- the same reading the live
+    no recorded entry is skipped rather than synthesised, so a fixture that
+    stops mid-history reads as "no data yet", the same reading the live
     adapter gives a post the platform has not indexed.
     """
 
@@ -704,8 +704,8 @@ class RecordedAdapter:
         platforms: Mapping[str, Platform] | None = None,
     ) -> list[Observation]:
         """Replay recorded metrics through the same mapping the live adapter
-        uses -- including the measurement refusal, so a test fixture cannot
-        quietly bypass the rule the live path enforces."""
+        uses, including the measurement refusal, so a test fixture cannot
+        bypass the rule the live path enforces."""
         _require_measurements(self.attribution_coverage, self.incrementality)
         since = _parse_timestamp(since)
         now = datetime.now(UTC)
@@ -714,9 +714,9 @@ class RecordedAdapter:
             response = self._responses.get(utm)
             if not response:
                 continue
-            # Unwrap exactly as the live adapter does, so a fixture line's
+            # Unwrap as the live adapter does, so a fixture line's
             # "response" is byte-compatible with what _execute would return
-            # for the same call -- one response shape, two consumers.
+            # for the same call: one response shape, two consumers.
             metrics = response.get("metrics", response)
             observation = observation_from_metrics(
                 utm,

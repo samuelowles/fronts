@@ -10,7 +10,7 @@ Why a distribution and not a plan: in Blotto with two or more fronts, every
 pure strategy is strictly dominated once the opponent can learn it. A fixed
 allocation can be read and outbid on every front that matters; only
 randomisation makes the opponent's cost of taking a front independent of what
-they know about you. The practical translation for distribution is direct --
+they know about you. The practical translation for distribution is direct:
 a fixed daily posting pattern is a pure strategy, and the platform's ranking
 plus every rival creator reading your feed are the outbidding opponents. The
 output of ``equilibrium_mixture`` is therefore a list of allocations with
@@ -36,7 +36,7 @@ class Front:
     """One contested allocation target with a prize weight.
 
     ``value`` is the prize for winning the front, not a multiplier on units.
-    Higher-value fronts attract more of everyone's budget, which is exactly
+    Higher-value fronts attract more of everyone's budget, which is
     the congestion effect the equilibrium construction prices.
     """
 
@@ -91,7 +91,7 @@ class BlottoAllocator:
         self._config = config if config is not None else BlottoConfig()
         self._rng = random.Random(self._config.seed)
 
-    # -- pure strategies ---------------------------------------------------
+    # --- pure strategies ---------------------------------------------------
 
     def pure_best_response(
         self,
@@ -101,7 +101,7 @@ class BlottoAllocator:
         """Greedy best response to a *known* opponent allocation.
 
         Winning front i costs ``opponent_allocation[i] + 1`` units and pays
-        ``value_i``, so the greedy order is by value per unit of cost -- the
+        ``value_i``, so the greedy order is by value per unit of cost, the
         fractional-knapsack order, which is the standard best-response
         heuristic for winner-take-more Blotto. Leftover units that can win
         nothing more are parked on the highest-value front so the allocation
@@ -136,7 +136,7 @@ class BlottoAllocator:
             allocation[strongest] += remaining
         return allocation
 
-    # -- mixed strategies --------------------------------------------------
+    # --- mixed strategies --------------------------------------------------
 
     def equilibrium_mixture(
         self,
@@ -153,7 +153,7 @@ class BlottoAllocator:
         the least valuable over-committed fronts when over budget, top up the
         fronts with headroom when under.
 
-        Discretising loses the exactness of Roberson's continuous result --
+        Discretising loses the exactness of Roberson's continuous result:
         with integer units the uniform marginal is only approximately
         achievable, and the repair step moves mass around. The direction of
         the construction (spread roughly uniform up to twice the pro-rata
@@ -199,7 +199,7 @@ class BlottoAllocator:
                 return allocation
         return mixture[-1][0]
 
-    # -- evaluation ----------------------------------------------------------
+    # --- evaluation ----------------------------------------------------------
 
     def exploitability(
         self,
@@ -210,9 +210,9 @@ class BlottoAllocator:
         """Share of total front value a best-responding opponent captures.
 
         Lower is better. This is the degenerate case of
-        ``mixture_exploitability`` -- the allocation is known to the opponent,
+        ``mixture_exploitability``: the allocation is known to the opponent,
         so a single committed response exploiting it exists. A committed pure
-        strategy scores badly here precisely because it can be read; see
+        strategy scores badly here because it can be read; see
         ``mixture_exploitability`` for the mixed-strategy comparison, which is
         the one that shows why the module returns distributions.
         """
@@ -234,14 +234,14 @@ class BlottoAllocator:
         best response to each allocation in the mixture plus
         ``opponent_samples`` allocations drawn from the configured opponent
         model; the max over a subset is a lower bound on the true best
-        response's capture, which is the honest direction (it can only
+        response's capture, which is the conservative direction (it can only
         understate the opponent, never overstate them).
 
         This is the metric under which mixing wins. Against a known pure
         allocation the expectation collapses and the opponent exploits
         exactly; against a mixture any single response is spread thin across
-        draws. Averaging ``exploitability`` over mixture samples instead --
-        scoring each draw as if the opponent saw it -- would defeat the point
+        draws. Averaging ``exploitability`` over mixture samples instead
+        (scoring each draw as if the opponent saw it) would defeat the point
         of measuring a mixed strategy at all.
         """
         if not fronts:
@@ -276,7 +276,7 @@ class BlottoAllocator:
             return 0.0
         return best_capture / total_value
 
-    # -- internals -----------------------------------------------------------
+    # --- internals -----------------------------------------------------------
 
     def _marginal_caps(self, fronts: Sequence[Front]) -> list[int]:
         """Per-front draw caps: ``floor(2 * units * value_share)``, in [0, units]."""
@@ -296,8 +296,8 @@ class BlottoAllocator:
         share, so this strips the least valuable over-commitment first).
         Under budget: add to fronts with headroom below their cap, breaking
         ties toward the largest cap. If every front is at cap and budget
-        remains -- possible only when the caps themselves cannot absorb the
-        budget -- the excess goes to the largest-cap front, because an
+        remains (possible only when the caps themselves cannot absorb the
+        budget), the excess goes to the largest-cap front, because an
         exact-sum allocation is a harder requirement than a respected marginal.
         """
         units = self._config.units

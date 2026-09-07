@@ -1,7 +1,7 @@
 """The reward function: contribution margin from paying users.
 
-It is not engagement, not reach, and not attributed conversions taken at face
-value. ``CodeWorldModel.get_rewards`` promises exactly this, and the reason is
+The reward is not engagement, reach, or attributed conversions taken at face
+value. ``CodeWorldModel.get_rewards`` promises this, and the reason is
 the inversion documented in ``fronts.game.priors.VECTOR_PRIORS``: the
 cheapest-CAC emotional vector is the worse business, so any objective that
 leans on acquisition cost selects confidently against lifetime value. Reward
@@ -10,7 +10,7 @@ has to be denominated in the thing the operator actually keeps.
 Deliberate omission, stated so no one "fixes" it: reach does not appear in
 the reward, and there is no ``vanity_penalty`` helper to make its absence
 look handled. Reach is an input the world model uses to model distribution;
-it is not a benefit. Adding it back -- even as a small negative term --
+it is not a benefit. Adding it back (even as a small negative term)
 re-introduces the objective the whole architecture exists to escape.
 """
 
@@ -36,7 +36,7 @@ __all__ = [
 
 _EPS = 1e-9
 """Guards divisions so a degenerate input yields a very large number rather
-than an exception -- a planner comparing two huge ratios is still behaving
+than an exception: a planner comparing two huge ratios is still behaving
 correctly, while a crashed planner is not."""
 
 
@@ -45,7 +45,7 @@ class Economics:
     """The unit economics every reward is computed against.
 
     ``allowable_cac_share`` defaults to 0.30 per GTM Engineer/Encyclopedia/
-    06_Pricing_and_Packaging.md -- the ceiling on CAC as a share of LTV. The
+    06_Pricing_and_Packaging.md, the ceiling on CAC as a share of LTV. The
     other fields are per-business inputs, not corpus constants, and carry no
     citation for that reason.
     """
@@ -59,7 +59,7 @@ class Economics:
 
     def __post_init__(self) -> None:
         # gross_margin is "after cost of service", and cost of service
-        # includes cost of goods -- hosting and delivery and support cannot
+        # includes cost of goods: hosting and delivery and support cannot
         # cost less than the goods alone. A config where the margin implies a
         # total cost below cogs_share has one of its two numbers wrong, and
         # every reward computed from it would be quietly denominated in a
@@ -69,7 +69,7 @@ class Economics:
                 f"gross_margin {self.gross_margin} + cogs_share "
                 f"{self.cogs_share} exceeds 1.0: cost of service includes "
                 "cost of goods, so the margin cannot retain more than the "
-                "goods cost -- one of the two numbers is wrong"
+                "goods cost. One of the two numbers is wrong"
             )
 
 
@@ -77,7 +77,7 @@ def ltv(economics: Economics) -> float:
     """Lifetime contribution of one paying user: ARPU x margin / churn.
 
     A zero churn rate means nobody ever leaves, which makes lifetime value
-    infinite, not undefined -- the guard returns ``math.inf`` so downstream
+    infinite, not undefined; the guard returns ``math.inf`` so downstream
     ratios stay orderable.
     """
     if economics.monthly_churn <= 0.0:
@@ -91,16 +91,16 @@ def true_conversions(observation: Observation) -> float:
     """De-biased conversion count: the number the dashboard would show if it
     could see everything and take credit for nothing it did not cause.
 
-    Two corrections pull in OPPOSITE directions, and an implementation that
+    Two corrections pull in opposite directions, and an implementation that
     applies only one of them is biased in a specific, damaging way:
 
-    * Dividing by ``attribution_coverage`` grosses UP for conversions the
+    * Dividing by ``attribution_coverage`` grosses up for conversions the
       trackers never saw. Ignoring this under-counts and systematically
       underrates channels with technical audiences (ad-blocker users vanish
       first).
-    * Multiplying by ``incrementality`` discounts DOWN for conversions that
+    * Multiplying by ``incrementality`` discounts down for conversions that
       would have happened anyway. Ignoring this over-counts and rewards
-      harvesting demand that was already there -- the failure that makes
+      harvesting demand that was already there, the failure that makes
       retargeting look like magic.
 
     Gross up for what you could not see, discount for what you would have got
@@ -125,8 +125,8 @@ def reward(observation: Observation, economics: Economics, cost: float) -> float
 
 
 def ltv_cac_ratio(economics: Economics, cac_usd: float) -> float:
-    """Lifetime value over acquisition cost. The primary ratio, precisely
-    because it ranks the expensive-and-durable vector above the cheap-and-
+    """Lifetime value over acquisition cost. The primary ratio, because it
+    ranks the expensive-and-durable vector above the cheap-and-
     evaporating one (see ``VECTOR_PRIORS``)."""
     if cac_usd <= 0.0:
         return math.inf
@@ -136,7 +136,7 @@ def ltv_cac_ratio(economics: Economics, cac_usd: float) -> float:
 def allowable_cac(economics: Economics) -> float:
     """The most a user may cost to acquire: ``allowable_cac_share`` of LTV.
 
-    This is what the ``Economics.allowable_cac_share`` field DOES -- the
+    This is what the ``Economics.allowable_cac_share`` field does: the
     corpus ceiling on CAC expressed in dollars, so a caller comparing a real
     or projected CAC against the ceiling compares like with like
     (``cac_usd <= allowable_cac(economics)``, equivalently
@@ -180,7 +180,7 @@ class PayoffHealth(Enum):
     """3.0 to 5.0: the corpus's benchmark for a scalable engine."""
 
     UNDERSPENDING = "underspending"
-    """Above 5.0: the constraint is no longer economics but supply -- you are
+    """Above 5.0: the constraint is no longer economics but supply: you are
     leaving growth un-bought, which is its own failure mode."""
 
 
@@ -188,8 +188,8 @@ def health(ratio: float) -> PayoffHealth:
     """Classify an LTV:CAC ratio.
 
     Infinity (zero churn, or zero CAC) classifies as UNDERSPENDING, which is
-    the correct reading: a ratio with no denominator is not a number to
-    admire but a signal that growth is unconstrained by economics.
+    the correct reading: a ratio with no denominator signals that growth is
+    unconstrained by economics.
     """
     if ratio < 1.0:
         return PayoffHealth.STOP

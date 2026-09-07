@@ -1,7 +1,7 @@
 """End-to-end tests: the whole loop, across module boundaries, on outcomes.
 
 The unit suites prove each layer correct in isolation. This file proves the
-LOOP -- history through the store, tests from the history, a report a human
+loop: history through the store, tests from the history, a report a human
 reads, search turned into a decision, a day allocated, briefs produced,
 moves shipped through an adapter, observations ingested back, and the whole
 thing re-planned. Each scenario below exists because a specific class of bug
@@ -21,7 +21,7 @@ The eight scenarios, in the order an operator would meet them:
    allocation -> briefs -> publish -> ingest -> re-plan.
 2. The measurement canary, through the report surface an operator reads.
 3. A legality refusal is visible and exits exactly 2, with its citation.
-4. The cold-start floor is reported honestly, at the boundary.
+4. The cold-start floor is reported accurately, at the boundary.
 5. A bad world model scores low and is rejected by the arena.
 6. Hostile synthesis output degrades to weaker play, never a crash.
 7. The same seed produces a byte-identical plan in a fresh process.
@@ -235,11 +235,11 @@ def test_full_loop_from_history_to_publish_and_back(
     it back through a save/load round trip, the report carries the pass
     rates, ISMCTS turns the model into decisions, Blotto spreads the day,
     briefs carry the join key, the dry adapter ships intents, ingest brings
-    the (empty, honestly empty) observations home, and the enlarged history
+    the (empty, deliberately empty) observations home, and the enlarged history
     re-plans. The class of bug caught here is the wiring bug: any seam where
-    stage N's output is not stage N+1's input -- a dropped ``Trajectory.chance``,
+    stage N's output is not stage N+1's input (a dropped ``Trajectory.chance``,
     a move that fails the legality gate the publisher will apply, a store
-    that records fewer moves than were shipped -- fails one of the asserts
+    that records fewer moves than were shipped) fails one of the asserts
     below, none of which a per-layer unit test can express.
     """
     config = default_config()
@@ -293,7 +293,7 @@ def test_full_loop_from_history_to_publish_and_back(
     publishes = [move for move in plan if isinstance(move, Publish)]
     assert publishes, "a plan that ships nothing exercises nothing downstream"
 
-    # EVERY planned move must survive the same legality engine the publisher
+    # Every planned move must survive the same legality engine the publisher
     # will apply, judged against the context built from the store.
     engine = LegalityEngine(config.policy)
     ctx = _legality_context(tmp_store, config, _TODAY)
@@ -363,7 +363,7 @@ def test_full_loop_from_history_to_publish_and_back(
 def test_reference_model_scores_one_through_the_report_surface(
     reference_trajectory: Callable[..., Trajectory],
 ) -> None:
-    """The instrument must read 1.00 on a known-good model, ON THE REPORT.
+    """The instrument must read 1.00 on a known-good model, on the report.
 
     This deliberately duplicates the unit-level canary in ``test_cwm.py``
     (``test_reference_model_scores_one_against_its_own_trajectories``), and
@@ -388,7 +388,7 @@ def test_reference_model_scores_one_through_the_report_surface(
     train_rate = _pass_rate(train, subject)
     test_rate = _pass_rate(held_out, subject)
     # The online split is self-play under the model's own policy, recorded
-    # and tested like any other history -- the same shape ``fronts accuracy``
+    # and tested like any other history, the same shape ``fronts accuracy``
     # produces.
     online_trajectory = _play_self_play_episode(subject, steps=30, seed=3)
     online_rate = _pass_rate(
@@ -446,8 +446,8 @@ def _play_self_play_episode(
 def test_legality_refusal_surfaces_rule_reason_and_source(
     move: Move, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
-    """Below the attribution floor an angle is unjudgeable and BOTH Scale and
-    Kill are refused -- and the refusal must be impossible to miss or
+    """Below the attribution floor an angle is unjudgeable and both Scale and
+    Kill are refused, and the refusal must be impossible to miss or
     mis-script.
 
     The bug class is the quiet refusal: an exit code that collides with
@@ -482,7 +482,7 @@ def test_legality_refusal_surfaces_rule_reason_and_source(
     assert source.endswith(".md"), f"the source must name a corpus file: {source!r}"
     assert "09_Attribution_and_Analytics" in source
     assert (tmp_path / "history.jsonl").read_bytes() == history_before, (
-        "a refused plan ships NOTHING -- not even the legal-looking parts"
+        "a refused plan ships nothing, not even the legal-looking parts"
     )
 
 
@@ -493,7 +493,7 @@ def test_untracked_publish_is_refused_with_exit_two(
 
     Untracked output can never produce an observation, so it poisons every
     downstream estimate by being invisible where its consequences land.
-    This is a system invariant rather than a corpus finding -- and it is
+    This is a system invariant rather than a corpus finding, and it is
     only reachable through the CLI because the action codec round-trips
     the empty utm that encode emits. A decode error here (exit 1, "non-
     canonical action keys") would bury the cited refusal behind a generic
@@ -514,7 +514,7 @@ def test_untracked_publish_is_refused_with_exit_two(
 
 
 # ---------------------------------------------------------------------------
-# Scenario 4: cold start is reported honestly.
+# Scenario 4: cold start is reported accurately.
 # ---------------------------------------------------------------------------
 
 
@@ -540,8 +540,8 @@ def _settled_history(count: int) -> Trajectory:
 def test_cold_start_floor_is_reported_not_silently_passed(
     tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
-    """Below the floor the system must SAY SO, and at the floor it must
-    clear -- both directions, because a one-sided check cannot tell a
+    """Below the floor the system must say so, and at the floor it must
+    clear, in both directions, because a one-sided check cannot tell a
     boundary from a slope.
 
     The failure mode this catches is optimism encoded as an off-by-one: a
@@ -607,14 +607,14 @@ def test_a_failing_model_scores_low_and_is_rejected_by_the_arena(
     able to SHOW a bad result (0.78 train, an agent that then loses badly)
     rather than routing around it. The bug class is the reporter that
     raises on a model whose numbers are far off, or the arena that crashes
-    on an agent whose model disagrees with the host's action space -- either
+    on an agent whose model disagrees with the host's action space. Either
     one converts a measurable failure into an outage, and an outage gets
     "fixed" by deleting the measurement.
 
     ``V1_SOURCE`` is a hand-authored wrong model: it satisfies the protocol
     and loads in the sandbox, but its observations (reach decaying from a
     flat 900) are far outside tolerance of what the reference model actually
-    produced. The arena's bad agent is the one that plans inside V1 -- on
+    produced. The arena's bad agent is the one that plans inside V1: on
     the reference host its action simply does not exist, which is what an
     agent built on a wrong model looks like from the outside.
     """
@@ -707,8 +707,8 @@ def test_sandbox_escape_attempts_fail_closed_and_the_planner_still_plans(
     extract -> sandbox path. Fail-closed means three things at once here:
     synthesis reports a candidate that failed to load instead of raising;
     nothing is written outside the temp dir (the escapes never execute at
-    all -- the sandbox refuses at compile time); and a planner handed the
-    resulting ``FallbackInference`` still returns a LEGAL move. That last
+    all; the sandbox refuses at compile time); and a planner handed the
+    resulting ``FallbackInference`` still returns a legal move. That last
     one is the operational point: a compromised or hallucinating provider
     must degrade the system to weaker play, never to an exception in the
     planning loop.
@@ -762,9 +762,9 @@ def test_same_seed_produces_an_identical_plan_in_a_fresh_process(
     This is the one scenario that must use subprocesses, and the reason is
     narrow but decisive: in-process determinism can hide a dependence on
     dict or set iteration order, because within one interpreter run a hash
-    seed is fixed and iteration order is stable -- the plan reproduces
+    seed is fixed and iteration order is stable: the plan reproduces
     perfectly and keeps reproducing until the day it ships from a cron job
-    on another box. ``PYTHONHASHSEED`` is deliberately UNSET in the children
+    on another box. ``PYTHONHASHSEED`` is deliberately unset in the children
     so hash randomisation is live and the two runs differ in every hash the
     interpreter draws; identical output then means identical behaviour, not
     identical luck. A plan an operator cannot re-derive after it disappoints
@@ -825,7 +825,7 @@ def test_plan_determinizes_with_the_sampler_beside_the_model(
 ) -> None:
     """``fronts synth`` writes ``inference.py`` beside the model; ``plan``
     must find it, name the determinization it used, and stay deterministic.
-    Without the file the same plan runs open-loop -- and says that instead,
+    Without the file the same plan runs open-loop and says that instead,
     because a planner that will not name its determinization is a planner
     whose confidence cannot be audited."""
     (tmp_path / "model.py").write_text(V2_SOURCE, encoding="utf-8")
@@ -850,7 +850,7 @@ def test_accuracy_scores_the_sampler_when_one_is_persisted(
     tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
     """With no sampler on disk the inference column reads n/a; with one it
-    carries measured numbers -- possibly damning ones, which is the point."""
+    carries measured numbers, possibly damning ones, which is the point."""
     (tmp_path / "model.py").write_text(V2_SOURCE, encoding="utf-8")
     config = _write_config(tmp_path)
     TrajectoryStore(tmp_path / "history.jsonl").save(_settled_history(5))
@@ -868,7 +868,7 @@ def test_accuracy_scores_the_sampler_when_one_is_persisted(
     )
 
     # A sampler that raises on every call must read as a bad score, never a
-    # stack trace -- this crashed with a traceback before the exception was
+    # stack trace; this crashed with a traceback before the exception was
     # counted as a miss inside inference_accuracy.
     (tmp_path / "inference.py").write_text(
         "class StateInferenceSampler:\n"
@@ -896,8 +896,8 @@ def test_golden_path_runs_with_sockets_blocked_and_no_credentials(
     """The condensed golden path, with the network physically gone.
 
     ``socket.socket`` itself raises, so any code path that silently reaches
-    for the network -- a stray SDK import that dials home, an adapter that
-    resolves a credential, a telemetry call nobody remembers adding -- fails
+    for the network (a stray SDK import that dials home, an adapter that
+    resolves a credential, a telemetry call nobody remembers adding) fails
     this test at the exact call site with ``RuntimeError: network access
     attempted``, which is the whole point of blocking the socket rather
     than stubbing it. Every credential the product knows how to read is

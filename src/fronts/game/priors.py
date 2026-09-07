@@ -1,9 +1,9 @@
 """Every empirical number the system is allowed to use.
 
-HARD REQUIREMENT, and the reason this module exists in this shape: a prior
+Hard requirement, and the reason this module exists in this shape: a prior
 without a source does not exist. Each number below is a measured figure from a
 specific corpus file, and the dataclass carrying it names that file. If a value
-cannot be attributed, it is not entered here -- it is either omitted or set to
+cannot be attributed, it is not entered here: it is either omitted or set to
 ``None`` with a comment saying the corpus does not measure it. An unattributed
 benchmark in a planning system is worse than a missing one: it optimises
 confidently against a number nobody can defend.
@@ -13,34 +13,34 @@ Two conventions make the source rule enforceable:
 * Every range is a ``Band``, and every ``Band`` carries its own ``source``.
 * A point estimate is encoded as a degenerate band (``low == high``) rather
   than a bare float, so that it too is forced to carry a citation. The
-  semantic-tier CPC column already works this way in the corpus -- only
-  generic slop is reported as a range -- so the convention is inherited, not
+  semantic-tier CPC column already works this way in the corpus (only
+  generic slop is reported as a range), so the convention is inherited, not
   invented.
 
 Nothing in this module computes anything. It is a table, checked at import
 time by ``scripts/selfcheck.py`` and at test time by ``tests/test_game.py``.
 
-WHERE THESE NUMBERS COME FROM, AND WHAT THAT MEANS FOR YOU
+Where these numbers come from, and what that means for you
 ----------------------------------------------------------
 The cited files are two private operator corpora. You cannot open them, and
-that matters more than it might look, so it is worth being exact about what the
+that matters more than it might look, so it is worth spelling out what the
 citations do and do not buy.
 
 What they buy: provenance. Every figure here was measured somewhere specific
 rather than invented to make a formula work, and the ``source`` string says
 where, so a number can be traced, questioned, and superseded. Three of the five
-entries in ``VECTOR_PRIORS`` are ``None`` for exactly this reason -- the corpus
+entries in ``VECTOR_PRIORS`` are ``None`` for this reason: the corpus
 does not measure them, so nothing is entered.
 
-What they do NOT buy: independent verification. You cannot check these against
+What they do not buy: independent verification. You cannot check these against
 the source, and you should not treat an unverifiable citation as evidence. Nor
 are they universal constants. They are one operator's measurements, in their
 verticals, at a point in time. A 40-48% hook rate for the anti-hero archetype
-was measured when few people were running it -- and ``solvers/congestion.py``
-exists precisely because that number is a statement about an uncrowded angle,
+was measured when few people were running it, and ``solvers/congestion.py``
+exists because that number is a statement about an uncrowded angle,
 not a property of the archetype.
 
-So treat this table as a STARTING PRIOR, not ground truth. It exists so a cold
+So treat this table as a starting prior, not ground truth. It exists so a cold
 system has somewhere to begin rather than a pile of zeroes. The moment you have
 your own settled history, your own measurements should replace these, and
 ``docs/OPERATING.md`` describes that loop. The architecture is indifferent to
@@ -49,7 +49,7 @@ something, which is why the rule is enforced by a check rather than a
 convention.
 
 If you are reading this to evaluate the project rather than to use it: the
-honest summary is that the *mechanism* is verifiable from this repository and
+short version is that the *mechanism* is verifiable from this repository and
 the *priors* are not. Judge them separately.
 """
 
@@ -154,7 +154,7 @@ class PlatformPrior:
 
     Engagement and reach: GTM Engineer/Encyclopedia/
     02_Metrics_and_Baselines_2026.md. Creative lifespan and weekly volume: GTM
-    Engineer/Encyclopedia/11_Paid_Channels_Deep_Dive.md -- the volume floor is
+    Engineer/Encyclopedia/11_Paid_Channels_Deep_Dive.md; the volume floor is
     what makes "post consistently" a scheduling constraint rather than advice.
     Landing-page CVR: GTM Engineer/Encyclopedia/08_Landing_Pages_and_CRO.md.
     """
@@ -228,8 +228,8 @@ SEMANTIC_TIER_PRIORS: dict[SemanticTier, SemanticPrior] = {
 # ASPIRATION_STATUS is the *cheaper* acquisition ($30 CAC) and the *worse*
 # business (45% month-3 churn, $250 LTV); EXHAUSTION_RELIEF acquires at more
 # than twice the cost ($65) and returns five times the lifetime value
-# ($1,200 at 8% churn). Any objective that minimises CAC -- or maximises
-# conversions per dollar, which is the same thing -- therefore selects the
+# ($1,200 at 8% churn). Any objective that minimises CAC (or maximises
+# conversions per dollar, which is the same thing) therefore selects the
 # wrong vector and compounds the error every day it runs. This is why
 # ``fronts.game.payoff`` rewards contribution margin and never CAC.
 #

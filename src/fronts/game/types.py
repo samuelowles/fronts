@@ -6,19 +6,19 @@ is allowed to look like.
 
 Design note, and it matters
 ---------------------------
-The world model's *internal* state is ``dict[str, Any]`` -- not a typed
-dataclass. This is not laziness. In Lehrach et al. (2025), the LLM synthesises
+The world model's *internal* state is ``dict[str, Any]``, not a typed
+dataclass. This is deliberate. In Lehrach et al. (2025), the LLM synthesises
 its own latent state representation, and the game rules plus the required API
 act as the only regulariser:
 
     "Instead of a bottleneck, or a regularization term, the game rules and the
     required OpenSpiel API (used in the unit tests) introduced in the context
     of the LLM act as regularizers to prevent trivial latent spaces from being
-    discovered."  -- Code World Models for General Game Playing, section 4.4
+    discovered." (Code World Models for General Game Playing, section 4.4)
 
-If we impose our own schema on the synthesised state, we destroy exactly the
+If we impose our own schema on the synthesised state, we destroy the
 degree of freedom that makes closed-deck synthesis work. The paper's own
-Hand of war result -- where the closed-deck agent *beat* the open-deck agent --
+Hand of war result (where the closed-deck agent *beat* the open-deck agent)
 is attributed to "the freedom to synthesize simpler state spaces."
 
 So: ``HiddenState`` below describes what we believe is really going on, and is
@@ -79,9 +79,9 @@ OPERATOR = 0
 """Us. The only player whose policy we control."""
 
 PLATFORM = 1
-"""The ranking algorithm. Not adversarial -- *misaligned*. It maximises session
-time and retention; we maximise paying users. It moves first and commits, which
-makes it a Stackelberg leader and us the follower."""
+"""The ranking algorithm. Misaligned rather than adversarial: it maximises
+session time and retention; we maximise paying users. It moves first and
+commits, which makes it a Stackelberg leader and us the follower."""
 
 FIELD = 2
 """The aggregate of every other creator competing for the same attention. Plays
@@ -149,7 +149,7 @@ class Archetype(str, Enum):
     """Narrative archetypes. The benchmark-carrying taxonomy.
 
     Source: Storytelling Engineer / 24_Benchmark_Tables_CTR_and_CVR_by_
-    Narrative_Archetype.md -- each member has measured hook rate, hold rate,
+    Narrative_Archetype.md; each member has measured hook rate, hold rate,
     outbound CTR and expected CVR bands.
     """
 
@@ -228,7 +228,7 @@ class ClaimClass(str, Enum):
     VERIFIABLE_METRIC = "verifiable_metric"
     """A number the operator can produce receipts for."""
     FIRST_PARTY_PROOF = "first_party_proof"
-    """Own-data demonstration. Expensive to fake -- high separating power."""
+    """Own-data demonstration, expensive to fake and high in separating power."""
     THIRD_PARTY_TESTIMONIAL = "third_party_testimonial"
     COMPARATIVE = "comparative"
     """Names a competitor. High CTR, high platform-rejection risk."""
@@ -239,14 +239,14 @@ class ClaimClass(str, Enum):
 # ---------------------------------------------------------------------------
 # Moves.
 #
-# The operator has two genuinely different kinds of decision, and collapsing
+# The operator has two different kinds of decision, and collapsing
 # them is the modelling error this whole repository exists to fix. Publishing is
 # cheap and reversible. Scaling commits real budget behind a belief, and the
-# corpora are unanimous that scaling on thin evidence is how accounts die.
+# corpora are unanimous that scaling on thin evidence destroys accounts.
 #
 # Making Scale a first-class move is what lets ``get_legal_actions`` refuse it
-# until the evidence gate opens. The planner then cannot choose it -- not
-# "is penalised for choosing it", cannot choose it. That is the paper's
+# until the evidence gate opens. The planner then cannot choose it (as opposed
+# to being penalised for choosing it). That is the paper's
 # verifiability claim applied to money.
 # ---------------------------------------------------------------------------
 
@@ -335,7 +335,7 @@ class RankingWeights:
     external_link_penalty: float = 0.0
     drift_rate: float = 0.0
     """Per-step magnitude of random walk. Non-zero drift is why angle selection
-    uses EXP3 rather than a stochastic bandit -- see ``fronts.solvers.exp3``."""
+    uses EXP3 rather than a stochastic bandit; see ``fronts.solvers.exp3``."""
 
 
 @dataclass(slots=True)
@@ -444,14 +444,14 @@ class Trajectory:
 
     Without this the whole measurement apparatus is broken, so it is worth being
     clear about why. All transitions are deterministic given the chance player's
-    action -- that is the paper's design and this repository keeps it. It
-    follows that a transition test can only be evaluated by replaying the SAME
+    action; that is the paper's design and this repository keeps it. It
+    follows that a transition test can only be evaluated by replaying the same
     chance outcome the recording drew. Re-sampling instead compares a model's
     prediction under one draw against a recording made under another, and scores
     the difference as model error.
 
-    That is not a small effect. When replay re-sampled, the reference model --
-    the ground truth, tested against trajectories it generated itself -- scored
+    That is not a small effect. When replay re-sampled, the reference model
+    (the ground truth, tested against trajectories it generated itself) scored
     between 0.20 and 0.50. A perfect model could not have done better. Every
     number downstream was noise: refinement could never hit its early stop, and
     accuracy reports sat on a scale whose maximum was unknown.
@@ -466,21 +466,21 @@ class Trajectory:
 # Evidence gates.
 #
 # The single most consequential idea in this file. A gate is a precondition on
-# acting, not a penalty for acting. Both corpora independently arrive at the
-# same conclusion -- that the dominant failure mode in distribution is not bad
-# creative but premature scaling -- and both state it numerically:
+# acting rather than a penalty for acting. Both corpora independently arrive at
+# the same conclusion (that the dominant failure mode in distribution is
+# premature scaling rather than bad creative) and both state it numerically:
 #
 #   "Never declare a winning emotional arc under 50 conversion events in a
 #    7-day rolling window"; calling it at 5 conversions sees CPA "frequently
 #    explode to $150" on scale-up.
-#       -- DTC / Storytelling Engineer 17_A_B_Testing_Story_Arcs...md
+#       (DTC / Storytelling Engineer 17_A_B_Testing_Story_Arcs...md)
 #
 #   "95% confidence, 80% power, 300+ conversions per variant, minimum 14 days,
 #    one variable per test... no peeking before minimum sample size."
-#       -- GTM 04_The_100x_Engineer_Mindset.md, 08_Landing_Pages_and_CRO.md
+#       (GTM 04_The_100x_Engineer_Mindset.md, 08_Landing_Pages_and_CRO.md)
 #
 # The two thresholds differ because the decisions differ: 50/7d licenses a
 # creative-level judgement, 300/14d licenses a spend commitment. Both are
-# enforced in ``fronts.game.legality`` -- ``OperatorPolicy`` carries the
+# enforced in ``fronts.game.legality``: ``OperatorPolicy`` carries the
 # thresholds, and every refusal cites its corpus source at the refusal site.
 # ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ inventing a degenerate representation:
     required OpenSpiel API (used in the unit tests) introduced in the context of
     the LLM act as regularizers to prevent trivial latent spaces from being
     discovered."
-        -- Lehrach et al., Code World Models for General Game Playing, s4.4
+        (Lehrach et al., Code World Models for General Game Playing, s4.4)
 
 Keep them narrow. Every method added here is a method the synthesiser can get
 wrong, and every method removed is a way for it to cheat.
@@ -160,10 +160,10 @@ class StateInference(Protocol):
 class ValueFunction(Protocol):
     """Heuristic state value, for use at planning leaves.
 
-    Synthesised, never fitted -- there is no ground truth to fit against. The
-    paper's remedy is selection rather than training: generate several
-    candidates and run a tournament between the agents that use them. We do the
-    same, in ``fronts.cwm.value``.
+    Synthesised rather than fitted, because there is no ground truth to fit
+    against. The paper's remedy is selection rather than training: generate
+    several candidates and run a tournament between the agents that use them.
+    We do the same, in ``fronts.cwm.value``.
     """
 
     def __call__(self, state: State, player: int) -> float: ...
@@ -216,11 +216,11 @@ class PlanResult(Protocol):
 class ModelReport(Protocol):
     """Quality metrics for a synthesised model.
 
-    Reported separately for train, held-out test and online play, exactly as the
-    paper does, because the gap between them is the interesting quantity. The
-    paper's own Gin rummy result -- 0.78 train, 0.75 test transition accuracy,
-    500 LLM calls, budget exhausted -- is the honest failure case, and a system
-    that cannot report a number that bad is hiding something.
+    Reported separately for train, held-out test and online play, as the paper
+    does, because the gap between them is the interesting quantity. The paper's
+    own Gin rummy result (0.78 train, 0.75 test transition accuracy, 500 LLM
+    calls, budget exhausted) is the failure case worth being able to show, and
+    a system that cannot report a number that bad is hiding something.
     """
 
     @property
@@ -228,7 +228,7 @@ class ModelReport(Protocol):
 
     @property
     def inference_accuracy(self) -> float | None:
-        """``None`` means not measured -- an honest gap, never a zero."""
+        """``None`` means not measured. It is a gap, never a zero."""
         ...
 
     @property

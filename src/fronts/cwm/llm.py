@@ -2,13 +2,13 @@
 
 The loop in ``fronts.cwm.synth`` needs exactly one thing from a language
 model: turn (system, user) into text. Keeping that behind a Protocol means
-the entire synthesis pipeline -- prompt building, code extraction, sandbox
-loading, test evaluation, refinement -- runs with zero network and zero
+the entire synthesis pipeline (prompt building, code extraction, sandbox
+loading, test evaluation, refinement) runs with zero network and zero
 provider SDKs installed, against fixtures recorded from real sessions.
 
 Why fixtures rather than mocks: a mock asserts what the caller already
 believes about the shape of a response, while a recorded fixture carries the
-messiness of a real one -- prose around the code, multiple fenced blocks, an
+messiness of a real one: prose around the code, multiple fenced blocks, an
 apology before the fix. Tests must exercise extraction against that mess, so
 the fixtures are committed and the client that produced them ships alongside
 the client that replays them.
@@ -68,7 +68,7 @@ def prompt_key(system: str, user: str) -> str:
 class FixtureMiss(Exception):
     """A prompt reached ``RecordedClient`` with no recorded response.
 
-    Carries the missing key so a failing test names exactly what to
+    Carries the missing key so a failing test names what to
     re-record, and the fix is a mechanical re-run of ``RecordingClient``
     rather than an investigation.
     """
@@ -86,8 +86,8 @@ class FixtureMiss(Exception):
 class RecordedClient:
     """Replay responses from a JSONL fixture. The default client for tests.
 
-    Each fixture line is ``{"key": <sha256 of system+user>, "response": str}``
-    -- exactly what ``RecordingClient`` writes. Unknown keys raise
+    Each fixture line is ``{"key": <sha256 of system+user>, "response": str}``,
+    exactly what ``RecordingClient`` writes. Unknown keys raise
     ``FixtureMiss`` rather than returning something plausible, because a
     synthesised-response fallback here would let the test suite drift away
     from what the provider actually returns while still passing.
@@ -147,14 +147,14 @@ class RecordingClient:
 @dataclass
 class AnthropicClient:
     """Anthropic SDK client. The SDK is imported inside ``complete`` so that
-    importing this module -- and everything downstream of it -- succeeds on a
+    importing this module, and everything downstream of it, succeeds on a
     machine with no network and no extras installed."""
 
     model: str = "claude-sonnet-4-6"
     max_tokens: int = 8192
     temperature: float = 1.0
     """Sampling temperature, forwarded on every call. The synthesis loop's
-    own preference (``SynthConfig.temperature``) is the caller's business --
+    own preference (``SynthConfig.temperature``) is the caller's business:
     the protocol has no sampling parameters so a fixture replay cannot drift
     from its recording."""
     _client: anthropic.Anthropic | None = field(default=None, repr=False, compare=False)
@@ -234,9 +234,9 @@ def extract_code(response: str) -> str:
 
     Models wrap code in fences, sometimes after a paragraph of apology, and
     occasionally emit several blocks (one broken attempt, then the fix).
-    Taking the LONGEST block implements that last case: the fix is longer
-    than the snippet it patches. With no fence at all -- rare but it happens,
-    especially on refinement passes -- the whole response is the code, and
+    Taking the longest block implements that last case: the fix is longer
+    than the snippet it patches. With no fence at all (rare but it happens,
+    especially on refinement passes) the whole response is the code, and
     the sandbox will reject it if it is not.
     """
     blocks = [match.group(1) for match in _FENCE.finditer(response)]

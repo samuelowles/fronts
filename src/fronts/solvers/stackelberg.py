@@ -3,20 +3,19 @@
 The platform is a Stackelberg leader: it commits to a ranking rule before the
 operator moves, and never reveals it. The operator is therefore always a
 follower, and correct play is a best response to an *estimate* of the
-commitment -- never to the commitment itself, which is unobservable, and
-never to a single point estimate of it, which is the mistake this module
-exists to talk the caller out of.
+commitment. The commitment itself is unobservable, and a single point
+estimate of it is the mistake this module exists to talk the caller out of.
 
 Why a point estimate is the wrong default under drift: the estimate carries a
 posterior, and a move that maximises the score under the posterior mean can
-be brittle across that posterior -- optimal if the weights are near the mean,
+be brittle across that posterior: optimal if the weights are near the mean,
 catastrophic in the tail, and the tail is where a drifting ranking function
 spends its time. Maximin (``worst_case``) picks the move with the best score
 under the least favourable estimate in the sampled set. It buys robustness at
 a known and computable cost in expected value: the gap between the maximin
 move's expected score and the best expected score, which for a serious
-posterior is exactly the premium worth considering before paying it.
-``value_of_information`` quantifies the other side -- what perfect observation
+posterior is the premium worth considering before paying it.
+``value_of_information`` quantifies the other side: what perfect observation
 of the commitment would be worth, i.e. the size of the prize for narrowing the
 posterior at all.
 """
@@ -36,7 +35,7 @@ __all__ = [
 
 M = TypeVar("M")
 """The move type. Deliberately generic: candidates may be angles, whole posts,
-or allocation bundles -- anything the caller's ``score_fn`` can score."""
+or allocation bundles, anything the caller's ``score_fn`` can score."""
 
 ScoreFn = Callable[[M, Mapping[str, float]], float]
 """Scores a move under a weight vector: ``score_fn(move, weights) -> float``."""
@@ -48,7 +47,7 @@ class LeaderEstimate:
 
     ``weights`` is the estimated weight vector the score function consumes;
     ``confidence`` is how much this sample deserves (posterior mass, sample
-    size, or a judgement call -- the semantics are the caller's); and
+    size, or a judgement call; the semantics are the caller's); and
     ``drift_rate`` is the expected per-step magnitude of the random walk in
     the underlying weights, carried per estimate so the caller can weight
     recent samples more heavily than stale ones.
@@ -92,13 +91,13 @@ def robust_best_response(
     """Rank moves by an aggregate of their scores across sampled estimates.
 
     ``aggregator`` selects the aggregate: "worst_case" scores each move by its
-    minimum over the estimate set (maximin -- see the module docstring for
+    minimum over the estimate set (maximin; see the module docstring for
     when that premium is worth paying), "expected" scores it by the
     confidence-weighted mean over the set. Estimates with zero total
     confidence fall back to uniform weights rather than dividing by zero.
 
-    An empty estimate set is rejected: robustness against nothing is just a
-    point estimate wearing a heavier name.
+    An empty estimate set is rejected rather than silently degrading to a
+    point estimate.
     """
     if not estimates:
         raise ValueError("estimates must be non-empty for a robust response")
@@ -152,8 +151,8 @@ def value_of_information(
     platform will pay for itself.
 
     Confidence weights the expectation, with a uniform fallback when total
-    confidence is zero. With a single estimate the gap is always 0 -- there is
-    no spread to exploit -- which is the correct answer and a useful sanity
+    confidence is zero. With a single estimate the gap is always 0 (there is
+    no spread to exploit), which is the correct answer and a useful sanity
     check on the caller's posterior.
     """
     if not estimates:

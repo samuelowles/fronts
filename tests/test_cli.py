@@ -3,7 +3,7 @@
 The CLI's contract with an operator's shell script is threefold, and each
 part is asserted here: the commands parse exactly as docs/OPERATING.md and
 README.md name them; ``publish`` touches nothing live without ``--live``; a
-legality refusal is exit code 2 and prints the rule, the reason AND the
+legality refusal is exit code 2 and prints the rule, the reason and the
 source, so the operator can see which rule stopped them and where it came
 from.
 """
@@ -94,7 +94,7 @@ incrementality = 0.70
 def _write_config(tmp_path: Path, *, measurements: bool = True) -> Path:
     """A config pointing every path at tmp_path. Measurements included by
     default because a publish-refusal fixture needs an above-floor coverage
-    for the evidence gate -- not the coverage gate -- to fire."""
+    for the evidence gate (not the coverage gate) to fire."""
     text = _CONFIG_TEMPLATE.format(
         history=(tmp_path / "history.jsonl").as_posix(),
         rules=(tmp_path / "rules.md").as_posix(),
@@ -120,7 +120,7 @@ def _write_history_with_conversions(
     tmp_path: Path, conversions: int, *, utm: str = "c0412ab9"
 ) -> Path:
     """A one-post history whose settled observation carries ``conversions``
-    conversions posted five days ago -- inside the 7d window, outside the
+    conversions posted five days ago, inside the 7d window and outside the
     reporting lag."""
     store = TrajectoryStore(tmp_path / "history.jsonl")
     store.append_move(
@@ -269,7 +269,7 @@ def test_publish_refusal_exits_two_and_prints_rule_reason_source(
     assert "12 settled conversions" in out
     assert "17_A_B_Testing_Story_Arcs" in out, "the source is part of the refusal"
     assert history.read_bytes() == history_before, (
-        "a refused plan ships NOTHING -- not even the legal-looking parts"
+        "a refused plan ships nothing, not even the legal-looking parts"
     )
 
 
@@ -369,7 +369,7 @@ def test_ingest_live_refuses_unmeasured_coverage(
     capsys: pytest.CaptureFixture,
 ) -> None:
     """A live ingest with no measurement on file refuses with the pointer
-    to docs/OPERATING.md rather than guessing -- exit 1, not a traceback."""
+    to docs/OPERATING.md rather than guessing: exit 1, not a traceback."""
     config = _write_config(tmp_path, measurements=False)
     store = TrajectoryStore(tmp_path / "history.jsonl")
     store.append_move(

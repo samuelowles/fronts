@@ -1,8 +1,8 @@
 """Synthesised value functions, selected by tournament rather than refined.
 
 A value function scores a state for planning at leaf depth. There is no
-ground truth to refine one against -- no oracle says "this state was worth
-0.63" -- so the paper's remedy is selection, not training: generate several
+ground truth to refine one against (no oracle says "this state was worth
+0.63"), so the paper's remedy is selection, not training: generate several
 candidates one-shot and run a tournament between the agents that use them,
 keeping whichever agent wins. That is why nothing in this module feeds a
 value function's failures back into a prompt: there is nothing to feed back.
@@ -10,8 +10,8 @@ The candidate either survived the arena or it did not.
 
 Returning no value function at all is a first-class outcome. The paper found
 value functions helped in only two of its ten games; in the rest the plain
-planner did as well or better. A heuristic that has not EARNED its place in
-the tournament is not a tiebreaker, it is noise with a decimal point.
+planner did as well or better. A heuristic that has not earned its place in
+the tournament adds noise to the comparison.
 """
 
 from __future__ import annotations
@@ -50,8 +50,7 @@ def synthesise_value_functions(
     """Generate ``n`` candidate value functions one-shot.
 
     Failures are skipped, not retried: without a feedback signal a retry is
-    the same bet placed twice, and the tournament needs candidates, not
-    persistence."""
+    the same bet placed twice."""
     system = (
         "You are a program synthesiser. You write heuristic state-value "
         "functions for a content-distribution planning problem, as Python "
@@ -96,12 +95,12 @@ def tournament(
     """Round-robin between agents built on each value function, on every
     host model in turn. Returns (value function, mean utility), best first.
 
-    Value functions are NOT refined, because there is no ground truth to
-    refine against; they are SELECTED by playing agents that use them
-    against each other (Lehrach et al. 2025, s5.3 -- the value-function
+    Value functions are not refined, because there is no ground truth to
+    refine against; they are selected by playing agents that use them
+    against each other (Lehrach et al. 2025, s5.3, the value-function
     tournament). The host models supply the environment the agents plan
     inside; a heuristic that only wins on one host was overfit to that
-    host's quirks, which is precisely what rotating hosts catches."""
+    host's quirks, which is what rotating hosts catches."""
     agents = [planner_factory(vf) for vf in value_functions]
     scores = [0.0] * len(agents)
     games = [0] * len(agents)
@@ -135,11 +134,11 @@ def select_best(
 ) -> ValueFunction | None:
     """Return the best value function, or None when none earned its place.
 
-    ``baseline`` is the planner's mean utility with NO value function; a
+    ``baseline`` is the planner's mean utility with no value function; a
     candidate must beat it by ``min_edge`` to be adopted. Returning None is
     legitimate and often right: the paper's value functions helped in only
-    two of ten games, and a heuristic that does not clear the baseline is a
-    regression wearing a tiebreaker's clothes."""
+    two of ten games, and a heuristic that does not clear the baseline makes
+    the planner worse."""
     if not scored:
         return None
     best_function, best_score = scored[0]

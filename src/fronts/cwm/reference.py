@@ -1,20 +1,20 @@
 """A hand-written reference world model implementing ``CodeWorldModel``.
 
-This is the only place in the repository where the TRUE dynamics are written
+This is the only place in the repository where the true dynamics are written
 down. It serves three purposes, and the third is why it must not be stubbed:
 
-1. Ground truth for tests -- a synthesised model's transition accuracy is
+1. Ground truth for tests: a synthesised model's transition accuracy is
    measured against trajectories this module generates.
-2. Host for arena tournaments -- when no ground truth exists for a candidate
+2. Host for arena tournaments: when no ground truth exists for a candidate
    model, some model has to stand in as the arena host, and the best available
    stand-in is this one.
-3. Generator of synthetic trajectories -- the LLM's only training signal.
+3. Generator of synthetic trajectories, the LLM's only training signal.
 
-Because the synthesiser sees this model's OUTPUT and never its code, every
+Because the synthesiser sees this model's output and never its code, every
 dynamic below is filtered through the observation model: the operator's view
 is late, partly blind to conversions, and partly fictional about attribution
-(``fronts.game.priors`` carries the measured figures). The hidden state --
-``theta``, standing, saturation, belief, fatigue -- never crosses that line.
+(``fronts.game.priors`` carries the measured figures). The hidden state
+(``theta``, standing, saturation, belief, fatigue) never crosses that line.
 """
 
 from __future__ import annotations
@@ -151,7 +151,7 @@ def _stable_uniform(seed_text: str, tag: str) -> float:
     Observation degradation is a chance process, but ``get_observations``
     must be reproducible or no trajectory could be unit-tested against a
     model. A hash stands in for the draw: the same post always reports the
-    same coverage, which is also true of the real thing -- a post's audience
+    same coverage, which is also true of the real thing: a post's audience
     does not re-randomise its ad-blocker rate every time the dashboard
     refreshes.
     """
@@ -198,8 +198,8 @@ class ReferenceWorldModel:
     """Ground-truth dynamics, per ``docs/GAME.md``, behind the CWM protocol.
 
     Determinism contract: every transition is a pure function of (state,
-    action). Randomness enters ONLY through the chance player's outcome,
-    which the caller samples from ``chance_outcomes`` -- the paper is strict
+    action). Randomness enters only through the chance player's outcome,
+    which the caller samples from ``chance_outcomes``. The paper is strict
     about this and so is the protocol docstring, because hidden
     nondeterminism makes trajectory unit tests impossible.
     """
@@ -209,7 +209,7 @@ class ReferenceWorldModel:
         self.engine = LegalityEngine()
         self.codec = ActionCodec()
 
-    # -- State helpers --------------------------------------------------------
+    # --- State helpers --------------------------------------------------------
 
     def _hidden(self, state: State) -> dict[str, Any]:
         hidden: dict[str, Any] = state["hidden"]
@@ -246,7 +246,7 @@ class ReferenceWorldModel:
             "step": hidden.step,
         }
 
-    # -- CodeWorldModel --------------------------------------------------------
+    # --- CodeWorldModel --------------------------------------------------------
 
     def initial_state(self) -> State:
         hidden = HiddenState(
@@ -298,8 +298,8 @@ class ReferenceWorldModel:
         """Delegate to ``LegalityEngine``; legality is not reimplemented here.
 
         The platform and the field never take a ply of their own: P1's
-        commitment IS theta (which drifts at chance nodes) and P2's strategy
-        IS saturation (which mean-reverts at chance nodes). OpenSpiel still
+        commitment is theta (which drifts at chance nodes) and P2's strategy
+        is saturation (which mean-reverts at chance nodes). OpenSpiel still
         gets a chance player it can sample, which is all a planner needs.
         """
         if state["phase"] != "operator":
@@ -335,7 +335,7 @@ class ReferenceWorldModel:
         """Contribution margin from settled observations, minus committed
         spend.
 
-        Reward accrues only on SETTLED observations: a number inside the
+        Reward accrues only on settled observations: a number inside the
         reporting lag is provisional, and provisional margin is not margin.
         Reach appears nowhere in this sum (``fronts.game.payoff`` says why,
         and asks future readers not to fix the omission)."""
@@ -362,7 +362,7 @@ class ReferenceWorldModel:
                 )
         return outcomes
 
-    # -- Operator moves ----------------------------------------------------------
+    # --- Operator moves ----------------------------------------------------------
 
     def _apply_operator(self, state: State, action: ActionKey) -> None:
         move = self.codec.decode(action)
@@ -513,7 +513,7 @@ class ReferenceWorldModel:
             }
         )
 
-    # -- Chance resolution ---------------------------------------------------------
+    # --- Chance resolution ---------------------------------------------------------
 
     def _apply_chance(self, state: State, action: ActionKey) -> None:
         try:
@@ -659,7 +659,7 @@ class ReferenceWorldModel:
         state["svc_today"] = 0
         state["phase"] = "terminal" if new_day >= self.config.horizon else "operator"
 
-    # -- Legality plumbing -----------------------------------------------------------
+    # --- Legality plumbing -----------------------------------------------------------
 
     def _candidate_publishes(self, state: State) -> list[Publish]:
         return list(
@@ -716,7 +716,7 @@ class ReferenceWorldModel:
             )
             coverages.setdefault(angle, []).append(obs.attribution_coverage)
         # Per-angle coverage collapses to its mean; unknown angles keep the
-        # conservative default of 0.0 -- unjudgeable, not clean.
+        # conservative default of 0.0: unjudgeable, not clean.
         ctx.angle_attribution_coverage = {
             angle: sum(values) / len(values) for angle, values in coverages.items()
         }
@@ -746,7 +746,7 @@ class ReferenceWorldModel:
         }
         return ctx
 
-    # -- Trajectories -----------------------------------------------------------------
+    # --- Trajectories -----------------------------------------------------------------
 
     def generate_trajectory(
         self,
@@ -757,7 +757,7 @@ class ReferenceWorldModel:
         """Play one episode under ``policy`` and record what the operator saw.
 
         Observations attach to their moves after the episode ends, because a
-        publish's numbers do not exist until the reporting lag clears -- a
+        publish's numbers do not exist until the reporting lag clears: a
         trajectory is recorded history, and history is written backwards.
         """
         state = self.initial_state()
@@ -767,9 +767,9 @@ class ReferenceWorldModel:
             player = self.get_current_player(state)
             if player == CHANCE_PLAYER:
                 action = sample_chance_outcome(self.chance_outcomes(state), rng)
-                # Recorded, not discarded. A transition is deterministic given
-                # the chance action, so a test that re-draws is measuring the
-                # dice rather than the model. See Trajectory.chance.
+                # Recorded rather than discarded. A transition is deterministic
+                # given the chance action, so a test that re-draws is measuring
+                # the dice rather than the model. See Trajectory.chance.
                 chance.append(action)
                 state = self.apply_action(state, action)
                 continue

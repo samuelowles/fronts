@@ -6,9 +6,9 @@ informative but because it is *differentially expensive*: education signals
 productivity only insofar as it costs less for productive people. Transferred
 to content, a claim in a post is credible exactly when imitating it costs a
 low-quality operator more than the deception is worth. That converts "be
-radically transparent" from advice into a computable inequality -- and, usefully,
-usually shows that transparency whose imitation is cheap (naming your
-revenue when nobody checks) separates nobody.
+radically transparent" from advice into a computable inequality, and the
+inequality usually shows that transparency whose imitation is cheap (naming
+your revenue when nobody checks) separates nobody.
 
 The mapping to content is an analogy and rests on two explicit assumptions.
 Receivers are Bayesian: they update on the signal rationally rather than
@@ -19,7 +19,7 @@ cost them. Where either assumption fails, the inequality below still computes
 something, but that something is no longer Spence's equilibrium.
 
 Claim classes arrive as plain strings. The mapping from the game's
-``ClaimClass`` enum to a ``SignalCost`` belongs to the caller -- it encodes
+``ClaimClass`` enum to a ``SignalCost`` belongs to the caller: it encodes
 empirical beliefs about what each kind of claim costs to fake, and a solver
 should not be in the business of hard-coding those beliefs.
 """
@@ -42,7 +42,7 @@ class SignalCost:
     carries no information. ``gain_from_deception``: what the low type gets
     from being believed (the value of traffic it cannot retain).
     ``benefit_high_type``: what the high type gets from being believed, net of
-    nothing -- the gross benefit, against which its own cost is measured.
+    nothing, the gross benefit, against which its own cost is measured.
     """
 
     cost_high_type: float
@@ -155,7 +155,7 @@ class ClaimCredibility:
 
         Ties break alphabetically by claim so the order is reproducible. A
         claim that fails ``separates`` scores 0.0 and sinks to the bottom
-        rather than being dropped -- an incredible claim still appears in the
+        rather than being dropped: an incredible claim still appears in the
         output, because "this claim separates nothing" is information the
         caller asked for when they included it.
         """

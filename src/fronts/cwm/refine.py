@@ -1,4 +1,4 @@
-"""Thompson-sampled tree search over candidate models -- the paper's REx.
+"""Thompson-sampled tree search over candidate models, the paper's REx.
 
 Synthesis is not one shot. The paper holds several candidate models
 simultaneously, and after each round chooses which to refine next by
@@ -10,7 +10,7 @@ The sampling rule, quoted from the paper's procedure: each node draws with
 
     alpha = 1 + C * h,   beta = 1 + (1 - h) * C,   C = 5.0
 
-where h is the average unit-test pass rate -- "favoring those that either
+where h is the average unit-test pass rate: "favoring those that either
 have high transition accuracy or have been refined few times" (a fresh node
 with h = 0.5 has a wider posterior than a heavily-refined one at the same
 mean, so exploration is built into the prior rather than bolted on as an
@@ -45,7 +45,7 @@ class RefineConfig:
     heuristic_weight: float = 5.0
     """C in the Beta prior."""
     num_retries: int = 500
-    """Refinement attempts before giving up -- the synthesis budget."""
+    """Refinement attempts before giving up, the synthesis budget."""
     num_tests_on_init: int = 5
     num_tests_on_error: int = 1
     min_heuristic_value_on_init: float = 0.01
@@ -89,8 +89,8 @@ class RefinementTree:
         the argmax.
 
         Nodes below ``min_heuristic_value`` are excluded unless nothing
-        qualifies, so a hopeless first candidate does not eat the budget --
-        but an all-hopeless tree still selects, because refusing to choose is
+        qualifies, so a hopeless first candidate does not eat the budget.
+        An all-hopeless tree still selects, because refusing to choose is
         not a strategy the paper provides for.
         """
         eligible = [n for n in self.nodes if n.h >= self.min_heuristic_value]
@@ -133,14 +133,14 @@ def refine(
 
     Each round: select a node, run its tests, feed the first failure's
     traceback back as the refinement prompt, and add the child only if it
-    clears ``min_heuristic_value_gain`` over its parent -- the paper keeps
+    clears ``min_heuristic_value_gain`` over its parent: the paper keeps
     refinements that improve and discards the rest, spending the call either
     way, which is what makes the retry budget a real budget.
 
     The tree's sampling knobs (``heuristic_weight``,
     ``min_heuristic_value``) are taken from ``config`` rather than left at
     the tree's own defaults: the config is the object callers tune, and a
-    tuned value that selection silently ignored would be a knob that lies.
+    tuned value that selection silently ignored would be misleading.
     """
     rng = random.Random(config.seed)
     tree.heuristic_weight = config.heuristic_weight
@@ -183,6 +183,6 @@ def refine(
 
 
 def best(tree: RefinementTree) -> RefinementNode:
-    """The node to deploy: highest pass rate, fewest refinements on ties --
+    """The node to deploy: highest pass rate, fewest refinements on ties;
     a simpler candidate that scores the same is the better artefact."""
     return min(tree.nodes, key=lambda node: (-node.h, node.refinements))

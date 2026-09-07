@@ -5,7 +5,7 @@ imperfect-information game with a known optimum. The operator picks one of
 three moves at an information set; a hidden quality ``q`` (good with p=0.3)
 gates whether ``rare_move`` is legal; a chance node then adds a bonus of 0.1
 with probability 0.25. Expected values: good_move 1.025, rare_move 0.925,
-bad_move 0.225 -- so the known-optimal move is ``good_move`` regardless of
+bad_move 0.225, so the known-optimal move is ``good_move`` regardless of
 ``q``, and ``rare_move`` is available in only some determinizations, which is
 what makes the fixture exercise the availability-denominator machinery.
 """
@@ -41,7 +41,7 @@ from fronts.solvers.stackelberg import (
     value_of_information,
 )
 
-# -- toy world model ---------------------------------------------------------
+# --- toy world model ---------------------------------------------------------
 
 
 class ToyWorld:
@@ -100,7 +100,7 @@ class ToyInference:
     """Determinization sampler: q good with p_good, reproducible per call index.
 
     Seeding from the call count (rather than holding one stream) makes the
-    sequence of determinizations identical for two identical plan runs -- the
+    sequence of determinizations identical for two identical plan runs, the
     property the ISMCTS determinism contract needs from any injected
     inference.
     """
@@ -124,7 +124,7 @@ class FailingInference:
         raise RuntimeError("inference unavailable")
 
 
-# -- ISMCTS -------------------------------------------------------------------
+# --- ISMCTS -------------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -174,7 +174,7 @@ def test_ismcts_availability_denominator_uses_legal_count() -> None:
 
     ``rare_move`` is legal only when the determinized quality is good
     (p = 0.3), so over 1000 simulations it should be *available* about 300
-    times while being *selected* far less often -- it is strictly worse than
+    times while being *selected* far less often, because it is strictly worse than
     ``good_move``. If selection were not restricted to the current
     determinization's legal actions, visits would exceed availability (that
     bug produced 995 selections out of 318 availabilities when first written).
@@ -244,7 +244,7 @@ def test_ismcts_config_validates_itself() -> None:
         ISMCTSConfig(exploration_c=0.0)
 
 
-# -- Blotto -------------------------------------------------------------------
+# --- Blotto -------------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -320,7 +320,7 @@ def test_blotto_config_rejects_bad_opponent_model() -> None:
         BlottoConfig(opponent_model="psychic")
 
 
-# -- EXP3 -----------------------------------------------------------------------
+# --- EXP3 -----------------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -386,7 +386,7 @@ def test_exp3_regret_bound_is_finite_and_tight_at_optimum() -> None:
         regret_bound(num_arms, rounds, 0.0)
 
 
-# -- congestion -----------------------------------------------------------------
+# --- congestion -----------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -456,7 +456,7 @@ def test_crowding_adjusted_ranking_flips_the_naive_order() -> None:
     ]
 
 
-# -- signalling -----------------------------------------------------------------
+# --- signalling -----------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -527,7 +527,7 @@ def test_separating_power_orders_claims_and_stays_in_range() -> None:
     assert ranked[-1][1] == 0.0
 
 
-# -- stackelberg ----------------------------------------------------------------
+# --- stackelberg ----------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -558,8 +558,8 @@ def test_point_and_robust_best_response_disagree_under_drift() -> None:
         moves, score, [confident_boost, shield_heavy], aggregator="expected"
     )
     # Confidence-weighted means: aggressive 10*0.9/1.4 ~= 6.43 vs safe
-    # (4*0.9+3*0.5)/1.4 ~= 3.64 -- the expectation regime flips back to
-    # aggressive, which is precisely the brittleness trade.
+    # (4*0.9+3*0.5)/1.4 ~= 3.64, so the expectation regime flips back to
+    # aggressive, which is the brittleness trade.
     assert expected[0][0] == "aggressive"
     assert expected[0][1] == pytest.approx(10.0 * 0.9 / (0.9 + 0.5))
 
@@ -605,13 +605,13 @@ def test_uct_formula_places_availability_inside_the_logarithm() -> None:
     availability inside the logarithm and visits underneath. The classic bug
     swaps them, putting the node's total visit count in the logarithm and
     availability underneath. Both variants still run, still terminate, and
-    still respect ``visits <= availability`` -- so the availability-accounting
+    still respect ``visits <= availability``, so the availability-accounting
     test above passes either way. This fixture is built so the two disagree.
 
     Two actions with identical mean value:
 
-      wide   availability 1000, visits 10  -- legal almost always, rarely tried
-      narrow availability   20, visits 10  -- legal rarely, tried just as often
+      wide   availability 1000, visits 10  (legal almost always, rarely tried)
+      narrow availability   20, visits 10  (legal rarely, tried just as often)
 
     Correct:  sqrt(ln 1000 / 10) = 0.831  >  sqrt(ln 20 / 10) = 0.547  -> wide
     Inverted: sqrt(ln 1000 / 1000) = 0.083 < sqrt(ln 1000 / 20) = 0.588 -> narrow

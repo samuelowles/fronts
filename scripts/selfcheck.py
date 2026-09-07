@@ -21,8 +21,8 @@ import sys
 from collections.abc import Callable
 from datetime import date
 
-# Importing every new module IS the first check: a module that cannot be
-# imported cannot be wrong in interesting ways, only boring ones.
+# Importing every new module is the first check: an import failure is the
+# earliest signal available.
 from fronts.game import action_space, legality, payoff, priors
 from fronts.game.action_space import ActionCodec
 from fronts.game.legality import (
@@ -139,7 +139,7 @@ def modules_import() -> None:
 
 @check
 def every_prior_has_a_source() -> None:
-    """A prior without a source must not exist -- verified per entry, per
+    """A prior without a source must not exist: verified per entry, per
     field, not by inspection."""
     for name, prior in priors.ARCHETYPE_PRIORS.items():
         for band in (
@@ -384,7 +384,7 @@ def economics_margin_and_cogs_cannot_contradict() -> None:
 
 # ===== solvers ===============================================================
 
-# -- a minimal world model for the ISMCTS checks -------------------------------
+# --- a minimal world model for the ISMCTS checks -------------------------------
 #
 # One decision with a hidden quality gating a rarely-legal action, then one
 # chance draw, then a terminal reward. Expected values: good_move 1.025,
@@ -571,7 +571,7 @@ def cwm_reference_reaches_terminal() -> None:
 @check
 def cwm_observations_carry_no_hidden_state() -> None:
     """No player's observation exposes theta, standing, saturation, belief
-    or fatigue -- the operator sees the degraded dashboard and nothing else."""
+    or fatigue: the operator sees the degraded dashboard and nothing else."""
     from fronts.cwm.reference import ReferenceConfig, ReferenceWorldModel
 
     model = ReferenceWorldModel(ReferenceConfig(horizon=3))
@@ -611,7 +611,7 @@ def main() -> int:
     for fn in CHECKS:
         try:
             fn()
-        except Exception as exc:  # noqa: BLE001 -- report, don't bury
+        except Exception as exc:  # noqa: BLE001 - report, don't bury
             failures.append((fn.__name__, f"{type(exc).__name__}: {exc}"))
     print(
         f"selfcheck: {len(CHECKS) - len(failures)}/{len(CHECKS)} checks passed"

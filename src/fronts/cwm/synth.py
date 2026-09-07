@@ -2,8 +2,8 @@
 
 One candidate per call to ``synthesise``: build the prompt, complete it,
 extract the code, sandbox-load it, instantiate the class, run the tests, and
-report the pass rate. Refinement -- choosing which candidate to fix next --
-lives in ``fronts.cwm.refine``; this module only ever produces ONE candidate,
+report the pass rate. Refinement (choosing which candidate to fix next)
+lives in ``fronts.cwm.refine``; this module only ever produces one candidate,
 so a test of the loop is a test of one turn of it.
 """
 
@@ -41,8 +41,8 @@ class SynthConfig:
     """Loop budget and sampling knobs.
 
     ``max_calls`` defaults to 500 because that is the paper's synthesis
-    budget -- the budget Gin rummy exhausted at 0.78 train accuracy, which is
-    the honest calibration for how far 500 calls gets you.
+    budget: the budget Gin rummy exhausted at 0.78 train accuracy, which
+    calibrates what 500 calls buys.
 
     ``temperature`` and ``model_name`` are consumed by ``fronts.cli`` when it
     builds a real provider client (``_client_from_env``); the ``LLMClient``
@@ -64,8 +64,8 @@ def default_api_spec() -> str:
     "Instead of a bottleneck, or a regularization term, the game rules and
     the required OpenSpiel API (used in the unit tests) introduced in the
     context of the LLM act as regularizers to prevent trivial latent spaces
-    from being discovered." Stating the API in the prompt -- mechanically,
-    from the live protocol, so it can never drift from what the tests call --
+    from being discovered." Stating the API in the prompt (mechanically,
+    from the live protocol, so it can never drift from what the tests call)
     is what stops the synthesiser from inventing a degenerate representation.
     """
     lines: list[str] = []
@@ -115,11 +115,11 @@ def build_prompt(
     """Return the (system, user) prompt for one synthesis call.
 
     Contains, always: the natural-language rules, a compact serialisation of
-    the trajectories, and the REQUIRED API lifted from
-    ``protocols.CodeWorldModel`` -- the API is the regulariser (PAPER.md s3;
+    the trajectories, and the required API lifted from
+    ``protocols.CodeWorldModel``; the API is the regulariser (PAPER.md s3;
     see ``default_api_spec``). Contains, on a refinement pass only, the
-    failing test's traceback, because a stack trace is worth a thousand
-    words of natural-language diagnosis.
+    failing test's traceback, which locates the failure better than
+    natural-language description.
     """
     api = api_spec if api_spec is not None else default_api_spec()
     # Tell the synthesiser what is bound rather than what is permitted. The
@@ -176,10 +176,10 @@ def build_prompt(
 class SynthesisResult:
     """One candidate and how it fared.
 
-    ``model`` is None when anything in the pipeline failed -- the model
+    ``model`` is None when anything in the pipeline failed (the model
     refused to emit code, the code violated the sandbox, the class was
-    missing a protocol method -- and ``error`` says which. A candidate that
-    loads but fails every test is a SUCCESS at this layer with pass_rate
+    missing a protocol method) and ``error`` says which. A candidate that
+    loads but fails every test is a success at this layer with pass_rate
     0.0: the loop's job is to fix those, and burying them as errors would
     starve refinement of its most informative starting points.
     """

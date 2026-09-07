@@ -3,24 +3,24 @@
 This is the feedback signal that makes iterative synthesis converge: a
 candidate model is judged by the tests generated here, its failures go back
 into the prompt as tracebacks, and the loop repeats. The paper's whole
-training signal is exactly this -- not gradients, not a reward model, just
-"the code you wrote fails these cases you were shown."
+training signal is this sentence, with no gradients and no reward model
+behind it: "the code you wrote fails these cases you were shown."
 
 Test kinds:
 
-* TRANSITION -- given a prefix and an action, does the predicted observation
+* TRANSITION: given a prefix and an action, does the predicted observation
   match the recorded one within tolerance.
-* LEGALITY -- a move the operator actually made must be legal in the model.
-* OBSERVATION_RECONSTRUCTION -- the closed-deck autoencoder: rebuild the
+* LEGALITY: a move the operator actually made must be legal in the model.
+* OBSERVATION_RECONSTRUCTION, the closed-deck autoencoder: rebuild the
   latent by replaying the action prefix, decode through the model, compare
   the predicted observation to what was seen.
-* NO_CRASH -- random legal play for N steps must not raise.
-* TERMINATION -- the model must reach a terminal state within the horizon.
+* NO_CRASH: random legal play for N steps must not raise.
+* TERMINATION: the model must reach a terminal state within the horizon.
 
-Closed deck is the default and it is a real constraint, not a flag. In the
+Closed deck is the default and it is a real constraint. In the
 closed-deck setting the agent only ever sees its own observations and
 actions, so with ``include_hidden=False`` no test that references hidden
-state is emitted -- only observation-reconstruction and no-crash survive.
+state is emitted: only observation-reconstruction and no-crash survive.
 As ``docs/PAPER.md`` s3 puts it, the paper's closed-deck procedure "drops
 every unit test requiring hidden state and keeps only observation -> latent
 -> observation reconstruction plus no-crash tests," producing "a kind of
@@ -103,7 +103,7 @@ class Tolerance:
     be that wide to absorb a +/-50% response bucket the model had no way to
     predict. That was a tolerance concealing a broken measurement rather than
     accommodating real variance. With chance replayed from the recording
-    (``Trajectory.chance``) the remaining error is genuinely the model's, so the
+    (``Trajectory.chance``) the remaining error is the model's, so the
     thresholds tighten to where a wrong model actually fails.
     """
 
@@ -116,7 +116,7 @@ class Tolerance:
         # Counts get a max(|actual|, 1) floor so a zero actual does not
         # demand an exactly-zero prediction: near-zero counts are noise, and
         # a suite that fails on noise teaches the model to memorise it.
-        # Rates get no floor -- their whole information content is the
+        # Rates get no floor: their whole information content is the
         # ratio, so their tolerance is strictly relative.
         scale = abs(actual) if is_rate else max(abs(actual), 1.0)
         return abs(predicted - actual) <= tol * scale
@@ -125,8 +125,8 @@ class Tolerance:
 @dataclass(frozen=True, slots=True)
 class TestResult:
     """Passed, a human-readable detail line, and the traceback when it
-    failed. The traceback is not optional decoration -- it is the exact
-    string that goes back into the next synthesis prompt."""
+    failed. The traceback is the exact string that goes back into the next
+    synthesis prompt."""
 
     passed: bool
     detail: str = ""
@@ -145,7 +145,7 @@ def _draw_recorded_chance(
     pending: list[ActionKey],
     rng: random.Random,
 ) -> tuple[ActionKey, bool]:
-    """Resolve one chance node during a replay: the next RECORDED outcome
+    """Resolve one chance node during a replay: the next recorded outcome
     that is legal here, or a fresh draw when the recording has run dry.
 
     This is the one rule every replay path shares, so it lives once: consume
@@ -153,7 +153,7 @@ def _draw_recorded_chance(
     the node the model actually reached (a model landing on different chance
     nodes than the recording is itself a modelling error, and forcing an
     invalid action to paper over it would corrupt the replay). The flag in
-    the return says whether the draw came from the recording -- a sampled
+    the return says whether the draw came from the recording: a sampled
     draw makes the caller's measurement degraded, and callers surface that
     rather than silently averaging it in.
     """
@@ -249,10 +249,10 @@ def settle(
 ) -> tuple[State, Observation]:
     """Advance until the latest operator observation stops being provisional.
 
-    A recorded trajectory stores what an operator eventually SAW, and what they
-    eventually saw is the settled number -- metrics inside the 24-72h reporting
-    window are provisional and are excluded from test generation for exactly
-    that reason. Replaying only up to the moment of publication therefore reads
+    A recorded trajectory stores what an operator eventually saw, and what they
+    eventually saw is the settled number: metrics inside the 24-72h reporting
+    window are provisional and are excluded from test generation for that
+    reason. Replaying only up to the moment of publication therefore reads
     a different quantity than the one recorded: in the reference model the
     provisional reach for a post is 2304 where the settled figure is 705, a
     factor of three that has nothing to do with model quality.
@@ -292,8 +292,8 @@ def settle(
 class ModelTest:
     """One executable assertion about a candidate model.
 
-    ``payload`` carries everything ``run`` needs -- the action prefix, the
-    recorded metrics, the seed -- so a test is data, can be serialised into a
+    ``payload`` carries everything ``run`` needs (the action prefix, the
+    recorded metrics, the seed), so a test is data, can be serialised into a
     prompt, and can be regenerated deterministically from the trajectory.
     """
 
@@ -379,7 +379,7 @@ class ModelTest:
         legal = model.get_legal_actions(state)
         # Compare modulo the tracking id. A utm is minted per post and is
         # required to be non-empty, but no specific value ever makes a move
-        # legal or illegal -- so a model that offers the right move under a
+        # legal or illegal, so a model that offers the right move under a
         # different utm has got the rule right, and failing it here would be
         # scoring bookkeeping as understanding.
         if _without_utm(action) not in {_without_utm(a) for a in legal}:
@@ -450,7 +450,7 @@ def generate(
     ``include_hidden=False`` is the closed-deck default: only
     observation-reconstruction and no-crash tests, per PAPER.md s3. The
     open-deck variants (transition, legality, termination) are emitted only
-    when the caller can legitimately see hidden state -- offline logs that
+    when the caller can legitimately see hidden state: offline logs that
     recorded it, which organic distribution never has.
     """
     tolerance = tolerance if tolerance is not None else Tolerance()
@@ -466,7 +466,7 @@ def generate(
         observation = step.observation
         # Partial observations must never become test cases. A metric read
         # inside the 24-72h reporting window is provisional; testing against
-        # it teaches the model to predict noise, exactly the failure the
+        # it teaches the model to predict noise, the failure the
         # evidence gates exist to prevent on the acting side (PAPER.md s5).
         if observation is None or observation.is_partial:
             continue
@@ -551,7 +551,7 @@ def split(
 
     Held-out evaluation is the whole diagnostic: the paper's Gin rummy
     failure is visible only because train (0.78) and test (0.75) were
-    reported separately. Shuffled with a seed so a split is reproducible --
+    reported separately. Shuffled with a seed so a split is reproducible:
     an unseeded split lets a lucky shuffle flatter a bad model."""
     rng = random.Random(seed)
     shuffled = list(tests)

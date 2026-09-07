@@ -1,10 +1,10 @@
 """The action space: structured moves in, opaque strings out.
 
 ``ActionKey`` is the only representation the synthesised world model ever
-sees -- the paper defines ``Action = str`` and we honour that at the CWM
+sees: the paper defines ``Action = str`` and we honour that at the CWM
 boundary. This module is the single crossing point (``fronts.game.types``
-says so explicitly), which means every property the strings must have --
-stability, determinism, collision freedom, human readability -- has to be
+says so explicitly), which means every property the strings must have
+(stability, determinism, collision freedom, human readability) has to be
 established here and nowhere else.
 
 The encoding is pipe-delimited position for the enum dimensions and
@@ -20,7 +20,7 @@ The encoding is pipe-delimited position for the enum dimensions and
 Free-text fields may not contain ``|``: allowing it would make the encoding
 ambiguous, and an ambiguous action space is a corrupted replay. Scale factors
 are rounded to two decimals on encode, so ``1.2`` and ``1.20`` produce the
-same key -- the key is canonical, and round-tripping is exact for any move
+same key. The key is canonical, and round-tripping is exact for any move
 whose factor is already at two decimals.
 """
 
@@ -85,12 +85,12 @@ def _check_free_text(field: str, value: str) -> None:
 
 def _parse_kv(token: str, expected: Sequence[str]) -> dict[str, str]:
     parts = token.split("=", 1)
-    # The KEY must be present and known; the VALUE may be empty. ``encode``
+    # The key must be present and known; the value may be empty. ``encode``
     # emits ``utm=`` for a Publish with an empty ``utm_content`` (only pipes
     # are forbidden in free text), so a decoder that rejected empty values
-    # would refuse to read back what the codec itself writes -- and would
+    # would refuse to read back what the codec itself writes, and would
     # bury the ``TRACKED_OUTPUT`` refusal (the cited system invariant that
-    # exists precisely for the untracked publish) behind a generic decode
+    # exists for the untracked publish) behind a generic decode
     # error instead of the rule, reason and source an operator is owed.
     if len(parts) != 2 or not parts[0]:
         raise ActionDecodeError(f"malformed key=value token: {token!r}")
@@ -133,7 +133,7 @@ class ActionCodec:
     def decode(self, key: ActionKey | str) -> Move:
         """Return the move encoded by ``key``.
 
-        Raises ``ActionDecodeError`` on anything malformed -- wrong arity,
+        Raises ``ActionDecodeError`` on anything malformed: wrong arity,
         unknown enum member, missing field, or unknown kind.
         """
         tokens = key.split("|")
@@ -148,7 +148,7 @@ class ActionCodec:
             return Hold()
         raise ActionDecodeError(f"unknown or malformed action kind: {key!r}")
 
-    # -- Publish -----------------------------------------------------------
+    # --- Publish -----------------------------------------------------------
 
     def _encode_publish(self, move: Publish) -> ActionKey:
         for field, value in (
@@ -210,7 +210,7 @@ class ActionCodec:
             utm_content=fields["utm"],
         )
 
-    # -- Scale / Kill / Hold -------------------------------------------------
+    # --- Scale / Kill / Hold -------------------------------------------------
 
     def _encode_scale(self, move: Scale) -> ActionKey:
         _check_free_text("angle", move.angle)
@@ -263,7 +263,7 @@ def utm_content_id(move: Move, salt: str) -> str:
     This is the join key between a move and its eventual ``Observation``:
     analytics reports the id, the game records the move, and the two meet
     here. Short because platforms truncate utm_content; hashed because two
-    creatives that differ only in hook must never share an id -- that would
+    creatives that differ only in hook must never share an id: that would
     quietly merge their learning.
     """
     codec = ActionCodec()
@@ -275,7 +275,7 @@ def restamp_unique(move: Publish, index: int) -> Publish:
     """Re-stamp a catalogue ``Publish`` with a per-step unique utm.
 
     The legal-action set is a fixed catalogue, so a policy that picks the
-    same entry twice publishes two distinct posts under one utm -- and utm
+    same entry twice publishes two distinct posts under one utm, and utm
     is the join key between a move and its observation. The posts then
     collapse to one row, later metrics overwrite earlier ones, and a
     transition test compares post A's prediction against post B's numbers.
@@ -308,7 +308,7 @@ def enumerate_publishes(
     planner needs a sample, not a census. The generator never materialises
     more than ``limit`` moves: when the product fits inside ``limit`` it
     enumerates it in deterministic index order, otherwise it samples flat
-    indices without replacement from ``random.Random(seed)`` -- same seed,
+    indices without replacement from ``random.Random(seed)``: same seed,
     same candidates, every run.
 
     Each yielded publish carries a utm id minted from its own (pre-utm) key
@@ -347,7 +347,7 @@ def enumerate_publishes(
     def build(flat_index: int) -> Publish:
         """Decode a flat index into one candidate Publish.
 
-        The flat encoding counts the LAST dimension fastest, so decoding
+        The flat encoding counts the last dimension fastest, so decoding
         peels dimensions off back-to-front; each pick is typed by its own
         dimension rather than flowing through one untyped list."""
         remaining = flat_index

@@ -1,9 +1,9 @@
 """Bad-model rejection before real budget is spent.
 
 The most operationally valuable idea in the paper. Ground truth does not
-exist for a synthesised world model -- if it did, we would not need the
-synthesis -- so candidate models and the agents that plan inside them are
-evaluated by playing them against EACH OTHER, with each candidate model in
+exist for a synthesised world model (if it did, we would not need the
+synthesis), so candidate models and the agents that plan inside them are
+evaluated by playing them against each other, with each candidate model in
 turn standing in as the host for the tournament. An agent that loses
 consistently, across hosts, is rejected before a day of real output is
 committed to its recommendations. The arena costs compute; a bad content
@@ -15,8 +15,8 @@ the best scoring agent by more than 10% of the observed utility range."
 One adaptation this domain forces, stated so nobody has to reverse-engineer
 it from the code: distribution is a single-operator game (operator versus
 chance/platform/field), so two agents cannot occupy opposite sides of one
-episode. Paired play instead runs each agent through its OWN episode on the
-same host model under COMMON RANDOM NUMBERS -- same chance seeds -- and
+episode. Paired play instead runs each agent through its own episode on the
+same host model under common random numbers (same chance seeds) and
 compares achieved operator utility. Same spirit, same rule; the dice are
 held fixed so the comparison measures the agent and not the lottery.
 """
@@ -65,8 +65,8 @@ class ArenaResult:
     ``score_matrix[i][j]`` is agent i's mean operator utility in its paired
     episodes against agent j; ``scores`` are row means; ``rejected`` is the
     list of agent indices the rule removed. The matrix is exposed because a
-    rejection a human cannot inspect is a rejection a human cannot overrule,
-    and the operator, not the arena, is the one who eats the consequence."""
+    human needs to be able to inspect and overrule a rejection, and the
+    operator rather than the arena bears the consequence."""
 
     score_matrix: list[list[float]]
     scores: list[float]
@@ -85,7 +85,7 @@ def play_episode(
     """Run one episode of ``agent`` on ``model``; return operator utility.
 
     The rng is seeded per episode so paired agents face identical chance
-    sequences -- common random numbers are what turns two noisy episodes
+    sequences: common random numbers are what turns two noisy episodes
     into one comparison."""
     rng = random.Random(seed)
     state = model.initial_state()
@@ -106,7 +106,7 @@ def play_episode(
             action = agent(model, state)
             if action not in legal:
                 # An illegal move in the paper's setting is a forfeit; here
-                # it is scored as one -- the agent gets nothing further and
+                # it is scored as one: the agent gets nothing further and
                 # keeps what it had, which is the sharpest available signal
                 # that its model and its policy disagree.
                 break
@@ -123,9 +123,9 @@ def run(
     """Round-robin tournament of ``agents`` on every host ``model`` in turn.
 
     Every agent plays every other; each host model stands in for the ground
-    truth that does not exist. Rejection rule, exactly as the paper states
-    it: reject any agent "worse than the best scoring agent by more than 10%
-    of the observed utility range" -- the range being max minus min over all
+    truth that does not exist. Rejection rule, as the paper states it:
+    reject any agent "worse than the best scoring agent by more than 10%
+    of the observed utility range". The range is max minus min over all
     individual episode utilities observed in the tournament, which makes the
     threshold a fraction of the spread the tournament actually saw rather
     than of some assumed utility scale.

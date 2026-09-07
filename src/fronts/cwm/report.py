@@ -1,20 +1,20 @@
 """Quality reporting for a synthesised model, in the paper's Table 1 shape.
 
-Why the train/test/online split is the whole point: the GAP between train
+Why the train/test/online split is the whole point: the gap between train
 and test is the diagnostic. Train accuracy says the model fit the data it
 was shown; test accuracy says whether it learned the dynamics or memorised
-the recordings; online accuracy -- measured during play, on states its own
-policy visited -- says whether it survives contact with a planner that
-trusts it. A model that scores 0.95 on train and 0.60 on test has not
-almost worked; it has overfit, and the fix is different from the fix for a
-model that scores 0.60 everywhere.
+the recordings; online accuracy (measured during play, on states its own
+policy visited) says whether it survives contact with a planner that
+trusts it. A model that scores 0.95 on train and 0.60 on test has overfit,
+and the fix is different from the fix for a model that scores 0.60
+everywhere.
 
-The paper's own Gin rummy result is the honest failure case a report must
-be able to show: 0.78 train, 0.75 test transition accuracy, 500 LLM calls,
-budget exhausted -- and the agent built on that model lost badly to a
+The paper's own Gin rummy result is the failure case a report must be able
+to show: 0.78 train, 0.75 test transition accuracy, 500 LLM calls,
+budget exhausted, and the agent built on that model lost badly to a
 ground-truth opponent. A reporting layer that cannot display a number that
-bad -- that averages the splits, or omits the call count -- is hiding the
-information an operator needs to decide NOT to deploy.
+bad (that averages the splits, or omits the call count) is hiding the
+information an operator needs to decide not to deploy.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ class ModelQualityReport:
     transition_accuracy_train: float = 0.0
     transition_accuracy_test: float = 0.0
     transition_accuracy_online: float = 0.0
-    # None means NOT MEASURED, rendered as "n/a". Scoring inference needs a
+    # None means not measured, rendered as "n/a". Scoring inference needs a
     # sampler to score (see ``fronts.cwm.inference.inference_accuracy``);
     # copying the transition numbers into these columns would manufacture a
     # measurement that never happened.

@@ -8,25 +8,25 @@ confidently wrong prior rather than a crash.
 
 Two properties are therefore non-negotiable and both are tested:
 
-* Writes are ATOMIC. A rewrite (``save``, ``mark_settled``) lands via a
+* Writes are atomic. A rewrite (``save``, ``mark_settled``) lands via a
   temp file in the same directory, flush, ``os.fsync``, then
   ``os.replace``. A process that dies mid-write leaves the previous file
-  intact and a stray ``*.tmp`` beside it -- never a half-written trajectory,
+  intact and a stray ``*.tmp`` beside it, never a half-written trajectory,
   because a truncated history is indistinguishable from a real one once the
   next model is trained on it.
 * ``Trajectory.chance`` round-trips. The recorded chance sequence is what
   makes a transition test a measurement rather than a coin flip (the
-  docstring on the field says exactly how badly this goes wrong: the
+  docstring on the field says how badly this goes wrong: the
   reference model scored 0.20 against its own trajectories when replay
   re-rolled the dice). Losing it on save does not fail any assertion at
   save time; it degrades every accuracy number read afterwards, which is
-  precisely the kind of bug this module exists to make impossible.
+  the kind of bug this module exists to make impossible.
 
 Line kinds: ``header`` (account, notes, chance), ``step`` (move with its
 observation, from ``save``), ``move`` and ``observation`` (separate lines,
 from live recording). The split exists because live history is written
-backwards -- a move is appended the moment it ships, its observation days
-later -- and the join on ``utm_content`` happens at load, in one place,
+backwards (a move is appended the moment it ships, its observation days
+later), and the join on ``utm_content`` happens at load, in one place,
 rather than being re-implemented by every reader.
 """
 
@@ -70,10 +70,10 @@ __all__ = [
 ]
 
 _REPORTING_LAG_HOURS_HIGH = REPORTING_LAG_HOURS.high
-"""Observations flip to settled only after the LONGEST measured lag has
+"""Observations flip to settled only after the longest measured lag has
 cleared. Using the low end would mark data settled while it can still
-move, which is peeking with extra steps; the high end is the reading the
-evidence gates already take (``settled_count`` drops partials entirely)."""
+move; the high end is the reading the evidence gates already take
+(``settled_count`` drops partials entirely)."""
 
 # The cold-start floor, from docs/OPERATING.md: "30 published items with
 # settled metrics, spanning at least two archetypes and two platforms.
@@ -91,7 +91,8 @@ class TrajectoryStats:
     """Counts an operator needs before trusting synthesis, plus the
     cold-start verdict. ``ready_for_synthesis`` encodes the whole floor at
     once because the individual counts only matter together: 30 settled
-    items on one archetype is a narrow game, not a cold start cleared."""
+    items on a single archetype describes a narrow game rather than a
+    cleared cold start."""
 
     moves: int
     settled_observations: int
@@ -116,7 +117,7 @@ class _Record(TypedDict, total=False):
 
     ``total=False`` because no single kind carries every key; the per-kind
     required keys are enforced by ``_validate_record`` at parse time, so the
-    TypedDict states exactly what a reader may find without letting a
+    TypedDict states what a reader may find without letting a
     malformed line through as an untyped ``dict``.
     """
 
@@ -133,9 +134,9 @@ def _validate_record(raw: object, line_number: int) -> _Record:
 
     A trajectory file is the single input everything downstream learns from,
     so a structurally wrong line is corruption rather than noise: it fails
-    HERE, naming the line, instead of as a ``KeyError`` three modules away --
-    or worse, as a silently skipped step that quietly shortens the history the
-    next model is trained on. Unknown ``kind`` values raise for the same
+    here, naming the line, instead of as a ``KeyError`` three modules away,
+    or worse as a skipped step that shortens the history the next model is
+    trained on with no error. Unknown ``kind`` values raise for the same
     reason: the four kinds are the file's whole grammar, and anything else
     means the store was written by something else.
     """
@@ -179,7 +180,7 @@ def _validate_record(raw: object, line_number: int) -> _Record:
         if not isinstance(payload.get("utm_content"), str):
             raise ValueError(
                 f"line {line_number}: observation payload has no string "
-                "'utm_content' -- without the join key the line can attach to "
+                "'utm_content'; without the join key the line can attach to "
                 "nothing"
             )
         record["observation"] = payload
@@ -227,11 +228,11 @@ class TrajectoryStore:
         self.path = Path(path)
         self._codec = ActionCodec()
 
-    # -- reading --------------------------------------------------------------
+    # --- reading -------------------------------------------------------------
 
     def _records(self) -> list[_Record]:
-        """Parse and validate every line. A truncated FINAL line is skipped
-        -- that is the one a crash mid-append can leave -- while anything
+        """Parse and validate every line. A truncated final line is skipped
+        (that is the one a crash mid-append can leave) while anything
         else that is not a well-formed record raises where it sits: interior
         corruption means the file was rewritten badly and every reading after
         it is suspect, and a line that parses as JSON but is not a valid
@@ -257,11 +258,11 @@ class TrajectoryStore:
     def load(self) -> Trajectory:
         """Rebuild the trajectory, joining observations to moves on utm.
 
-        The join takes the LATEST observation for a utm: analytics pulls
+        The join takes the latest observation for a utm: analytics pulls
         refresh numbers, and the later line is the fresher reading.
         Observations whose utm matches no recorded move are dropped from
         the trajectory (there is nothing to attach them to) but remain
-        visible to ``stats()`` as ``unmatched_utm`` -- an unmatched id
+        visible to ``stats()`` as ``unmatched_utm``, because an unmatched id
         usually means the move log predates the utm stamping rule, which is
         worth knowing about rather than silently discarding.
         """
@@ -300,12 +301,12 @@ class TrajectoryStore:
     def settled_only(self) -> Trajectory:
         """The trajectory reduced to steps whose observation has settled.
 
-        Steps with partial or absent observations are DROPPED rather than
+        Steps with partial or absent observations are dropped rather than
         blanked: a blanked step keeps the move visible to test generation
         while hiding the number, and anything that keeps a provisional
-        number one refactor away from a test case is a footgun. The honest
-        cost is a shorter action history, which ``generate`` in
-        ``fronts.cwm.tests_from_traj`` already tolerates -- it slices
+        number one refactor away from a test case is a footgun. The cost
+        is a shorter action history, which ``generate`` in
+        ``fronts.cwm.tests_from_traj`` already tolerates; it slices
         prefixes by position, not by continuity.
         """
         trajectory = self.load()
@@ -357,7 +358,7 @@ class TrajectoryStore:
             ready_for_synthesis=ready,
         )
 
-    # -- writing --------------------------------------------------------------
+    # --- writing -------------------------------------------------------------
 
     def append_move(self, move: Move, posted_at: str) -> None:
         """Record one move the moment it ships, before any data exists.
@@ -377,7 +378,7 @@ class TrajectoryStore:
     def attach_observation(self, observation: Observation) -> None:
         """Record one observation; the join to its move happens at load.
 
-        The join key is ``utm_content`` and nothing else -- which is why an
+        The join key is ``utm_content`` and nothing else, which is why an
         untracked publish is illegal (``TRACKED_OUTPUT`` in the legality
         engine): a move whose observation cannot be matched is a move the
         system cannot learn from.
@@ -422,12 +423,12 @@ class TrajectoryStore:
     def mark_settled(self, now: datetime) -> int:
         """Flip stale partials to settled; return how many flipped.
 
-        Idempotent, and a no-op rewrite when nothing changed -- rewriting
+        Idempotent, and a no-op rewrite when nothing changed: rewriting
         an unchanged file is a needless window for the very corruption the
         atomic write exists to prevent. Timestamps are compared in one
         frame (see ``_normalise``); posted_at is day-granular by the game
         layer's convention, so a post flips on the first ``now`` at least
-        ``REPORTING_LAG_HOURS.high`` past its posting DAY.
+        ``REPORTING_LAG_HOURS.high`` past its posting day.
         """
         when = _normalise(now)
         changed = 0
@@ -453,7 +454,7 @@ class TrajectoryStore:
             self._atomic_write(rewritten)
         return changed
 
-    # -- plumbing --------------------------------------------------------------
+    # --- plumbing -------------------------------------------------------------
 
     def _raw_lines(self) -> list[str]:
         if not self.path.exists():
@@ -469,12 +470,12 @@ class TrajectoryStore:
             os.fsync(handle.fileno())
 
     def _atomic_write(self, lines: list[str]) -> None:
-        """Temp file in the SAME directory, flush, fsync, ``os.replace``.
+        """Temp file in the same directory, flush, fsync, ``os.replace``.
 
         Same-directory is the load-bearing detail: ``os.replace`` is atomic
         within a filesystem, and a temp file on another volume makes the
-        final rename a copy -- non-atomic, and exactly the window a crash
-        uses to truncate the history. On any failure the temp file is
+        final rename a copy, which is non-atomic and opens the window a
+        crash uses to truncate the history. On any failure the temp file is
         removed and the previous file stands untouched.
         """
         self.path.parent.mkdir(parents=True, exist_ok=True)

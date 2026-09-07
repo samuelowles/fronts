@@ -9,18 +9,18 @@ each arm's reward distribution is fixed and unknown, and both will lock onto
 an arm whose early rewards were good, exploiting it indefinitely. Angle
 selection violates that assumption twice over. The platform's ranking weights
 drift continuously (a non-stationary reward process), and the field of rival
-creators adapts to whatever we do -- if we pile onto an angle because it paid
-last week, the crowding that follows is not noise around a fixed mean, it is
-a response to our policy. That is the adversarial setting, and it is exactly
-the setting EXP3 was built for: it keeps a persistent exploration floor
+creators adapts to whatever we do: if we pile onto an angle because it paid
+last week, the crowding that follows is a response to our policy rather than
+noise around a fixed mean. That is the adversarial setting EXP3
+was built for: it keeps a persistent exploration floor
 (gamma) so no drift or crowding event can permanently hide an arm, and its
 guarantee holds against an arbitrary reward sequence, not a stochastic one.
 
 Two implementation details that naive EXP3s get wrong and this module does
 not. Rewards must already be normalised to [0, 1]; ``update`` validates that
 and raises rather than silently corrupting the weights, because an
-importance-weighted reward outside [0, 1] is not a scaling issue, it is a
-wrong-scale issue and every subsequent probability is garbage. And weights are
+importance-weighted reward outside [0, 1] is on the wrong scale, and every
+subsequent probability computed from it is garbage. And weights are
 renormalised whenever the maximum exceeds ``weight_ceiling``: the unbiased
 estimator scales reward by 1/p, so under a persistent winner the winning
 weight grows without bound and a long enough run overflows to inf, after which
@@ -116,7 +116,7 @@ class EXP3:
     Weights start uniform. Each round: draw an arm from the mixed distribution
     (exploit the weights, explore with probability gamma), then update the
     drawn arm's weight by the importance-weighted reward ``reward / p`` where
-    p is the probability the arm was actually drawn with -- the factor that
+    p is the probability the arm was actually drawn with, the factor that
     makes an adversarial guarantee possible, since it de-biases the one sample
     we saw into an estimate of what a full-information algorithm would have
     seen.
@@ -157,7 +157,7 @@ class EXP3:
 
         The estimate is the importance-weighted reward ``reward / p_arm``,
         exponentiated by ``gamma / K`` as in Algorithm 1 of Auer et al.
-        (2002). Rewards outside [0, 1] raise ValueError -- see the module
+        (2002). Rewards outside [0, 1] raise ValueError; see the module
         docstring for why this is validation rather than clipping.
         """
         if arm not in self.weights:
@@ -186,16 +186,16 @@ class EXP3P:
 
     EXP3's guarantee is in expectation. EXP3.P (Auer et al. 2002, section 4)
     adds a confidence term beta to the update so the bound holds with high
-    probability -- against a single adversarial realisation of the rewards,
-    not merely on average over replays. The estimate is additionally capped at
+    probability (against a single adversarial realisation of the rewards,
+    not merely on average over replays). The estimate is additionally capped at
     1 (``s_hat = min(1, reward / p)``), trading a little bias for a bound on
     the variance of the importance-weighted estimator; the cap is what makes
     the high-probability argument go through.
 
     The cost is a slower, more conservative learner: beta inflates every
     update, so the algorithm is harder to surprise. For angle selection the
-    trade is usually right -- one adversarial week in which the estimator
-    latches onto a decaying angle is exactly the failure this variant
+    trade is usually right: one adversarial week in which the estimator
+    latches onto a decaying angle is the failure this variant
     prevents.
     """
 
@@ -230,7 +230,7 @@ class EXP3P:
     def update(self, arm: str, reward: float) -> None:
         """Update with the capped estimate plus the confidence term.
 
-        ``w_arm *= exp((eta * min(1, reward / p) + beta) / K)`` -- the paper's
+        ``w_arm *= exp((eta * min(1, reward / p) + beta) / K)``, the paper's
         update with its learning rate exposed as ``eta``. The cap bounds the
         estimate at 1 so a single very unlikely draw cannot dominate the
         weights; beta is the confidence bonus.
@@ -262,7 +262,7 @@ def regret_bound(num_arms: int, rounds: int, gamma: float) -> float:
     where K is the number of arms, T the number of rounds, and G_max the best
     fixed arm's cumulative reward (at most T since rewards are capped at 1).
     Minimised over gamma at gamma* = sqrt(K ln K / ((e - 1) T)) the bound is
-    2 sqrt((e - 1) T K ln K) -- the O(sqrt(T K ln K)) adversarial rate.
+    2 sqrt((e - 1) T K ln K), the O(sqrt(T K ln K)) adversarial rate.
     """
     if num_arms < 1:
         raise ValueError(f"num_arms must be >= 1, got {num_arms}")
