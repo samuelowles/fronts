@@ -169,10 +169,10 @@ model. That check is what makes every later accuracy reading meaningful:
   passed against the model that wrote it: 243
   pass rate: 1.00
 
-  1.00, exactly. Tolerances are the tightened ones (counts 0.05,
-  rates 0.02) -- wide tolerances here would only ever conceal a broken
-  instrument. A synthesised model is now measured against this scale,
-  whose maximum is finally KNOWN to be 1.00.
+  A perfect score at the tight tolerances (counts 0.05, rates 0.02).
+  Wide tolerances here would only conceal a broken instrument. A
+  synthesised model is now measured on a scale whose maximum is a
+  verified 1.00.
 ```
 
 Search output, with visit counts. You can read the planner's confidence
@@ -196,9 +196,9 @@ A refusal, with the rule and the source file the threshold came from:
     source: Storytelling Engineer/17_A_B_Testing_Story_Arcs_Statistical_Significance_in_Emotion.md
   ----------------------------------------------------------------------------
 
-  And peeking does not help: 100 conversions inside the reporting
-  lag plus 12 settled counts as 12 -- partials are dropped
-  entirely, not prorated.
+  Peeking does not help: 100 conversions inside the reporting lag
+  plus 12 settled counts as 12. Partial observations are
+  dropped, never prorated.
 ```
 
 Refusals exit with code 2, so a pipeline can tell a refusal from a crash.

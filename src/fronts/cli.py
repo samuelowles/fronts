@@ -1,17 +1,15 @@
 """The ``fronts`` command line: the operating loop from docs/OPERATING.md.
 
-argparse from the standard library, and nothing else. A CLI that needs a
-wheel installed before it will say anything is a CLI nobody runs on the box
-that matters, and the core's zero-dependency guarantee is worth exactly as
-much as its least necessary import.
+argparse from the standard library, and nothing else, which is what keeps
+the core's zero-dependency guarantee intact.
 
 Three conventions carry the whole file:
 
-* Exit codes are a contract: 0 success, 1 error, 2 REFUSED-BY-LEGALITY.
-  Code 2 is distinct because a refusal is not a failure -- it is the system
-  working. An operator scripting the loop needs to distinguish "retry" from
-  "stop and look at what you were about to post", and a refusal that exits
-  1 teaches their wrapper to retry it.
+* Exit codes are a contract: 0 success, 1 error, 2 refused by legality.
+  Code 2 is distinct because a refusal is the system working as designed.
+  An operator scripting the loop needs to distinguish "retry" from "stop
+  and look at what you were about to post", and a refusal that exits 1
+  teaches their wrapper to retry it.
 * ``publish`` is a dry run unless ``--live`` is passed. Real posts are
   irreversible and outward-facing; every other flag combination may be
   tried freely, but the one that speaks to the internet has to be asked
@@ -238,12 +236,12 @@ def _play_trajectory(
     """Play a random-legal episode of ``model`` and record it as a
     Trajectory, for the online split of ``accuracy``.
 
-    Observations are collected from the OPERATOR's (degraded) view after
-    each chance ply, keyed by utm -- the same convention
+    Observations are collected from the operator's (degraded) view after
+    each chance ply, keyed by utm, the same convention
     ``ReferenceWorldModel.generate_trajectory`` uses, so test generation
     sees one shape regardless of who recorded the history. Chance outcomes
-    are recorded, not discarded: replaying a fresh draw would charge the
-    model for the dice rather than for itself (``Trajectory.chance``).
+    are recorded rather than discarded: replaying a fresh draw would charge
+    the model for the dice rather than for itself (``Trajectory.chance``).
     """
     trajectory = Trajectory(account="online")
     state = model.initial_state()
@@ -266,7 +264,7 @@ def _play_trajectory(
         move = _CODEC.decode(action)
         if isinstance(move, Publish):
             # Without this the online split of ``accuracy`` scored the
-            # REFERENCE model below 1.0 -- ``restamp_unique`` explains the
+            # reference model below 1.0; ``restamp_unique`` explains the
             # collision it prevents.
             move = restamp_unique(move, len(moves))
             action = _CODEC.encode(move)
@@ -290,9 +288,9 @@ def _legality_context(
 
     Approximations, stated so nobody has to infer them from behaviour:
     spend and allocation history are not recorded in the trajectory store,
-    so they arrive empty (the drawdown and velocity rules see no evidence
-    and do not fire -- the gates that depend on recorded evidence are the
-    ones this context can feed honestly). Coverage comes from the operator's
+    so they arrive empty; the drawdown and velocity rules see no evidence
+    and do not fire, while the gates that depend on recorded evidence get
+    fed what was recorded. Coverage comes from the operator's
     measurement or, when unmeasured, 0.0: unmeasured means unjudgeable,
     which is the reading the coverage rule itself mandates and the reason
     an unconfigured system refuses to scale anything rather than nothing.
@@ -337,16 +335,16 @@ def _legality_context(
 
 def _print_refusal(move: Move, verdict: Any) -> None:
     """Print the refusal an operator is owed: the rule, the reason, and the
-    source it cites. The source is not decoration -- an operator asked to
-    eat a day of silence is entitled to answer 'says who?' (``Verdict``)."""
-    print("REFUSED -- publishing aborted; one move in the plan is illegal:")
+    source it cites. An operator asked to eat a day of silence is entitled
+    to ask who says so (``Verdict``)."""
+    print("REFUSED: publishing aborted; one move in the plan is illegal:")
     print(f"  move:   {_CODEC.encode(move)}")
     print(f"  rule:   {verdict.rule}")
     print(f"  reason: {verdict.reason}")
     print(f"  source: {verdict.source}")
     print(
         "  (docs/OPERATING.md: a planner that asks for an illegal move is a "
-        "bug in the planner; you want this loud, not shipped.)"
+        "bug in the planner, and better loud than shipped.)"
     )
 
 
@@ -374,10 +372,9 @@ def _read_plan(config: FrontsConfig) -> list[Move]:
 def _brief_for(move: Publish, destination_url: str | None) -> dict[str, Any]:
     """One publish move as the JSON brief the creative pipeline consumes.
 
-    The fields are exactly the creative dimensions of ``Publish`` plus the
-    utm the finished asset must carry -- the brief is where the join key is
-    communicated to a human, which is the one step no amount of automation
-    replaces."""
+    The fields are the creative dimensions of ``Publish`` plus the utm the
+    finished asset must carry. The brief is where the join key reaches a
+    human."""
     return {
         "platform": move.platform.value,
         "format": move.format.value,
@@ -409,12 +406,12 @@ def _client_from_env(config: SynthConfig) -> AnthropicClient | OpenAIClient:
     holds, applying the synthesis config's sampling knobs.
 
     The order is arbitrary and stated: Anthropic first, because the
-    synthesis prompts were written against it -- which is also why
-    ``model_name`` is applied only on the Anthropic path; it names a Claude
-    model and handing it to a different provider would be a configuration
-    error wearing a sensible-looking default. ``temperature`` applies to
-    both: it is the synthesis loop's exploration knob, not a provider
-    setting.
+    synthesis prompts were written against it. That is also why
+    ``model_name`` applies only on the Anthropic path; it names a Claude
+    model, and handing it to a different provider would be a configuration
+    error wearing a plausible default. ``temperature`` applies to both,
+    since it is the synthesis loop's exploration knob rather than a
+    provider setting.
     """
     if os.environ.get("ANTHROPIC_API_KEY"):
         return AnthropicClient(
@@ -539,10 +536,9 @@ def _cmd_accuracy(args: argparse.Namespace) -> int:
 
     # The online split measures the model on states its own policy visited:
     # a self-play episode under the model, recorded and tested like any
-    # other history. This is self-consistency under its own dynamics -- a
-    # necessary condition, not the paper's full online protocol, which
-    # needs the live loop. Printed as such, because a number that quietly
-    # overstates what was measured is worse than a caveat.
+    # other history. That is self-consistency under its own dynamics, a
+    # necessary condition rather than the paper's full online protocol,
+    # which needs the live loop. The printed note says so.
     online_trajectory = _play_trajectory(model, steps=30, rng=_rng(args))
     online_tests = generate(online_trajectory, Tolerance(), include_hidden=False)
     online_rate, online_passed, online_total = pass_rate(online_tests)
@@ -585,9 +581,9 @@ def _cmd_accuracy(args: argparse.Namespace) -> int:
         )
     else:
         inference_note = (
-            "inference is the sampler's autoencoder pass rate -- support "
-            "membership, not density (fronts.cwm.inference) -- on recorded "
-            "history (train) and self-play (online)."
+            "inference is the sampler's autoencoder pass rate (support "
+            "membership rather than density; see fronts.cwm.inference) on "
+            "recorded history (train) and self-play (online)."
         )
     print(
         "note: splits are pass rates on closed-deck "
@@ -602,8 +598,7 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     model_path = config.paths.model
     if not model_path.exists():
         print(
-            f"no world model at {model_path}; run `fronts synth` first. "
-            "(A plan from no model is a guess with a table around it.)",
+            f"no world model at {model_path}; run `fronts synth` first.",
             file=sys.stderr,
         )
         return EXIT_ERROR
@@ -664,7 +659,7 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     print(
         "determinization: synthesised sampler (closed-deck)"
         if inference is not None
-        else "determinization: open-loop -- no inference sampler beside the model"
+        else "determinization: open-loop (no inference sampler beside the model)"
     )
     for index, decision in enumerate(decisions):
         print(f"\ndecision {index + 1}: {decision['move']}")
@@ -675,8 +670,8 @@ def _cmd_plan(args: argparse.Namespace) -> int:
                 f"{entry['value']:>14,.1f}"
             )
     print(
-        "\nvisit counts are the search's confidence: an action visited twice "
-        "against its rival's two hundred is a hedge, not a recommendation."
+        "\nvisit counts are the search's confidence: an action visited a "
+        "handful of times is a hedge the search could not rule out."
     )
     return EXIT_OK
 
@@ -685,11 +680,11 @@ def _cmd_arena(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     rng = _rng(args)
 
-    # The arena's real question is "which SYNTHESISED model is bad", and it
+    # The arena's real question is which synthesised model is bad, and it
     # needs several candidates to ask it. With fewer on disk the tournament
-    # still runs -- strategies compete inside what exists -- but the note
+    # still runs (strategies compete inside what exists), but the note
     # below says so, because a rejection between strategies is not a
-    # rejection between models and reading it as one would be the exact
+    # rejection between models, and reading it as one is the
     # confident-direction error the arena exists to prevent.
     hosts: list[CodeWorldModel] = [ReferenceWorldModel(ReferenceConfig())]
     if config.paths.model.exists():
@@ -887,14 +882,14 @@ def _cmd_stats(args: argparse.Namespace) -> int:
     print(
         f"  unit economics:        LTV ${ltv(economics):,.0f}, allowable CAC "
         f"${allowable_cac(economics):,.0f} "
-        f"({economics.allowable_cac_share:.0%} of LTV -- the ceiling every "
+        f"({economics.allowable_cac_share:.0%} of LTV, the ceiling every "
         "acquisition bet is judged against)"
     )
     if stats.ready_for_synthesis:
         print("  cold start: CLEARED (>=30 settled across >=2 archetypes, >=2 platforms)")
     else:
         print(
-            "  cold start: NOT cleared -- docs/OPERATING.md wants 30 settled "
+            "  cold start: NOT cleared; docs/OPERATING.md wants 30 settled "
             "items across at least two archetypes and two platforms before "
             "synthesis is worth its calls; use the model-free solvers until then."
         )

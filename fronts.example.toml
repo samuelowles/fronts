@@ -13,7 +13,7 @@ briefs   = "data/briefs.json"          # written by `brief`
 
 [economics]
 # YOUR unit economics, per paying user per month. The reward the planner
-# maximises is contribution margin computed from these -- see
+# maximises is contribution margin computed from these; see
 # src/fronts/game/payoff.py for what each field does to it.
 arpu_monthly      = 100.0    # revenue per paying user per month
 gross_margin      = 0.8      # after cost of service
@@ -46,13 +46,13 @@ text_thread = 5
 
 [composio]
 # Platform I/O via Composio (https://composio.dev). The api key is read
-# from COMPOSIO_API_KEY when api_key is unset -- prefer the environment;
+# from COMPOSIO_API_KEY when api_key is unset. Prefer the environment;
 # keys in files get committed.
 # api_key         = "cs_..."
 user_id          = "user-123"
 max_retries      = 3
 # Action slugs are UNVERIFIED against a live account (see
-# ToolkitRegistry). When a real slug differs, override it here -- no code
+# ToolkitRegistry). When a real slug differs, override it here; no code
 # change needed. Keys are "publish:<platform>" / "analytics:<platform>".
 # slug_overrides = { "publish:x" = "X_CREATE_POST" }
 
@@ -62,8 +62,8 @@ max_retries      = 3
 destination_url = "https://example.com/pricing"
 
 [measurement]
-# THE TWO NUMBERS NOTHING ELSE CAN SUPPLY. Leave commented out until you
-# have measured them -- docs/OPERATING.md, "The thing that will bite you".
+# The two numbers nothing else can supply. Leave commented out until you
+# have measured them; docs/OPERATING.md, "The thing that will bite you".
 # Until they are set, ingest refuses to build observations rather than
 # guessing, and the legality engine keeps every angle unjudgeable.
 #

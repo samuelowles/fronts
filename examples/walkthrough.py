@@ -1,20 +1,20 @@
-"""One runnable story: the whole loop, offline, in under thirty seconds.
+"""The whole loop, offline, in under thirty seconds.
 
 No API keys, no network, no LLM. Everything below runs against the
-hand-written ``ReferenceWorldModel`` standing in for a synthesised one --
-which is exactly how the system behaves before `fronts synth` has anything
-to learn from, and why the model-free solvers exist.
+hand-written ``ReferenceWorldModel`` standing in for a synthesised one,
+which is how the system behaves before `fronts synth` has anything to
+learn from, and why the model-free solvers exist.
 
-Read this top to bottom; each numbered section is one move in the argument.
+Read top to bottom; each numbered section is one step.
 
     1. History exists before models do.
-    2. The cold-start floor is checked, not vibes.
+    2. The cold-start floor is checked programmatically.
     3. The measuring instrument reads 1.00 on a known-good model.
-    4. Search turns compute into a decision -- with the numbers shown.
+    4. Search turns compute into a decision, with the numbers shown.
     5. A day's output is allocated like a Colonel Blotto force.
-    6. Angle selection adapts under drift, because the world is adversarial.
-    7. A Scale on 12 conversions is IMPOSSIBLE, not discouraged. (Centre-
-       piece: this is the moment that shows what the system is for.)
+    6. Angle selection adapts under drift.
+    7. A Scale on 12 conversions is illegal. This section is the point
+       of the whole system.
     8. The highest-benchmark archetype is the wrong one to crowd onto.
 
 Run:  PYTHONPATH=src python examples/walkthrough.py
@@ -41,9 +41,9 @@ from fronts.solvers.ismcts import ISMCTS, ISMCTSConfig
 ANGLE = "launch_theater"
 
 POLICY_RNG = random.Random(13)
-"""Seeded so the walkthrough prints the same numbers on every run -- the
-README quotes them verbatim. The global ``random`` here would reseed from OS
-entropy each run and drift the settled/partial counts."""
+"""Seeded so the walkthrough prints the same numbers on every run; the
+README quotes them verbatim. The global ``random`` module would reseed from
+OS entropy each run and drift the settled/partial counts."""
 
 
 def banner(number: int, title: str) -> None:
@@ -54,9 +54,9 @@ def banner(number: int, title: str) -> None:
 
 
 def random_policy(model: ReferenceWorldModel, state: object) -> str:
-    """A uniform-random legal policy. Legality is a PRECONDITION on
-    planning, so even this dumb policy never proposes an illegal move --
-    that is the point of section 7."""
+    """A uniform-random legal policy. Legality is a precondition on
+    planning, so even this policy never proposes an illegal move. Section 7
+    shows why that matters."""
     legal = model.get_legal_actions(state)  # type: ignore[attr-defined]
     return POLICY_RNG.choice(legal)
 
@@ -64,10 +64,10 @@ def random_policy(model: ReferenceWorldModel, state: object) -> str:
 # ---------------------------------------------------------------------------
 # 1. Generate a synthetic history from the reference model.
 #
-# WHY: the closed-deck setting has exactly one training signal -- the
-# operator's own moves and the observations that came back. Everything
-# downstream (tests, models, plans) is fit against history like this. We
-# generate it rather than fetch it so the walkthrough runs with no keys.
+# WHY: the closed-deck setting has one training signal, the operator's own
+# moves and the observations that came back. Everything downstream (tests,
+# models, plans) is fit against history like this. We generate it rather
+# than fetch it so the walkthrough runs with no keys.
 # ---------------------------------------------------------------------------
 
 banner(1, "History: the only training signal there is")
@@ -89,10 +89,10 @@ for seed in (7, 21, 42):
     )
 
 print(
-    "\n  The observations are LATE (24-72h) and PARTLY FICTIONAL (coverage\n"
-    "  below 1, incrementality below 1) because that is what a dashboard\n"
-    "  actually returns. A model trained on clean numbers would be planning\n"
-    "  for a world that does not exist."
+    "\n  Observations arrive late (24-72h) and degraded (coverage and\n"
+    "  incrementality below 1), because that is what a real dashboard\n"
+    "  returns. A model trained on clean numbers would be planning for a\n"
+    "  world that does not exist."
 )
 
 # ---------------------------------------------------------------------------
@@ -130,19 +130,18 @@ assert stats.ready_for_synthesis, "demo history should clear the cold-start floo
 reloaded = store.load()
 assert reloaded.chance == merged.chance, "Trajectory.chance must round-trip"
 print(
-    "\n  Trajectory.chance survived save/load -- transition tests replayed\n"
-    "  from this store measure the model, not the dice."
+    "\n  Trajectory.chance survived save/load, so transition tests replayed\n"
+    "  from this store measure the model rather than the dice."
 )
 
 # ---------------------------------------------------------------------------
 # 3. Unit tests from history; pass rate must be 1.00.
 #
-# WHY THIS IS THE MOST IMPORTANT NUMBER IN THE REPO: a measuring instrument
-# has to read zero on a known-zero input before any reading it gives means
-# anything. The reference model generated this history, so a test suite
-# built from that history must score PERFECTLY against the reference model.
-# When this harness first ran it read 0.20 -- two bookkeeping bugs, not a
-# modelling error -- and every downstream number inherited the corruption
+# WHY: a measuring instrument has to read zero on a known-zero input before
+# any reading it gives means anything. The reference model generated this
+# history, so a test suite built from that history must score 1.00 against
+# the reference model. When this harness first ran it read 0.20 because of
+# two bookkeeping bugs, and every downstream number inherited the corruption
 # (see docs/OPERATING.md, "Before you trust any of these numbers").
 # ---------------------------------------------------------------------------
 
@@ -165,20 +164,20 @@ assert pass_rate == 1.00, (
     f"wrong; every downstream number is noise (got {pass_rate:.2f})"
 )
 print(
-    "\n  1.00, exactly. Tolerances are the tightened ones (counts 0.05,\n"
-    "  rates 0.02) -- wide tolerances here would only ever conceal a broken\n"
-    "  instrument. A synthesised model is now measured against this scale,\n"
-    "  whose maximum is finally KNOWN to be 1.00."
+    "\n  A perfect score at the tight tolerances (counts 0.05, rates 0.02).\n"
+    "  Wide tolerances here would only conceal a broken instrument. A\n"
+    "  synthesised model is now measured on a scale whose maximum is a\n"
+    "  verified 1.00."
 )
 
 # ---------------------------------------------------------------------------
 # 4. ISMCTS: one decision, with the statistics behind it.
 #
 # WHY: the paper's core move is shifting the LLM's job from policy to
-# MODEL, and letting search convert compute into decisions. Planning never
+# model, and letting search convert compute into decisions. Planning never
 # calls a language model. The visit counts and values are printed because
 # an operator about to spend a day of output on this plan is owed the
-# numbers, not just the pick.
+# numbers as well as the pick.
 # ---------------------------------------------------------------------------
 
 banner(4, "ISMCTS: search, not prompting (with visit counts and values)")
@@ -191,28 +190,28 @@ result = PLANNER.plan(SUBJECT, state, 0, 150)
 ranked = sorted(result.visits.items(), key=lambda item: (-item[1], str(item[0])))
 print(f"  chosen move:\n    {result.move}")
 # Values are cumulative-margin units and run large in the reference model
-# (reward sums every settled observation so far); their RELATIVE size is
+# (reward sums every settled observation so far). Their relative size is
 # the decision-relevant quantity, so they are printed raw, not rescaled.
 print(f"\n  {'action':<62} {'visits':>6} {'value':>13}")
 for action, visits in ranked[:5]:
     value = result.values.get(action, 0.0)
     print(f"  {str(action)[:62]:<62} {visits:>6} {value:>13,.0f}")
 print(
-    f"\n  150 simulations. The top action absorbed {ranked[0][1]} of them --\n"
-    "  that concentration IS the planner's confidence. An action visited a\n"
-    "  handful of times is a hedge the search could not rule out, not a\n"
-    "  recommendation. (Here search runs open-loop against the state; with a\n"
-    "  synthesised model, a resample_state sampler would determinize over\n"
-    "  what the observations actually support.)"
+    f"\n  150 simulations, {ranked[0][1]} of them absorbed by the top action.\n"
+    "  That concentration is the planner's confidence. An action visited\n"
+    "  once or twice is a hedge the search could not rule out. (Search here\n"
+    "  runs open-loop against the state; with a synthesised model, a\n"
+    "  resample_state sampler would determinize over what the observations\n"
+    "  support.)"
 )
 
 # ---------------------------------------------------------------------------
 # 5. Colonel Blotto: a day's output as a force across contested fronts.
 #
-# WHY: a fixed daily pattern is a PURE strategy, and every pure strategy in
+# WHY: a fixed daily pattern is a pure strategy, and every pure strategy in
 # Blotto is dominated once opponents can read it. The platform's ranking
 # and every rival reading your feed are those opponents. The output is a
-# DISTRIBUTION over allocations; one day draws from it.
+# distribution over allocations; one day draws from it.
 # ---------------------------------------------------------------------------
 
 banner(5, "Blotto: allocate the day's posts across fronts")
@@ -233,21 +232,21 @@ for front, units in day.items():
 assert sum(day.values()) == 10, "the budget is spent exactly"
 mixed_exploit = allocator.mixture_exploitability(mixture, fronts, 20)
 print(
-    f"\n  Sums to exactly 10: the budget is spent whether the plan accounts\n"
-    f"  for it or not. Best single response to the whole MIXTURE captures\n"
-    f"  {mixed_exploit:.0%} of front value; a committed daily pattern would\n"
-    f"  hand a reading opponent near 100%. Randomisation is not sloppiness\n"
-    f"  here -- it is the only thing that makes your pattern unreadable."
+    f"\n  The allocation sums to 10, so the full budget is spent either way.\n"
+    f"  The best single response to the whole mixture captures\n"
+    f"  {mixed_exploit:.0%} of front value, while a fixed daily pattern\n"
+    f"  would hand a reading opponent nearly all of it. Randomisation is\n"
+    f"  what keeps the pattern unreadable."
 )
 
 # ---------------------------------------------------------------------------
 # 6. EXP3: angle selection that adapts, because rewards are adversarial.
 #
 # WHY NOT UCB/THOMPSON: they assume each arm's reward distribution is fixed.
-# Platform ranking weights drift, and the field crowds whatever paid last
-# week -- the reward process is adversarial, and EXP3's guarantee holds
-# against exactly that. Watch the distribution follow a moving best arm
-# without ever collapsing onto it.
+# Platform ranking weights drift and the field crowds whatever paid last
+# week, so the reward process is adversarial, and EXP3's guarantee holds
+# against that. Watch the distribution follow a moving best arm without
+# collapsing onto it.
 # ---------------------------------------------------------------------------
 
 banner(6, "EXP3: angle selection under drift (200 rounds)")
@@ -282,21 +281,20 @@ assert final["founder_field_notes"] > final["launch_theater"], (
     "EXP3 should have followed the drift by round 200"
 )
 print(
-    "\n  The distribution MOVED with the world (launch_theater decays,\n"
-    "  founder_field_notes accretes) and never collapsed: the exploration\n"
+    "\n  The distribution moved with the world (launch_theater decays,\n"
+    "  founder_field_notes accretes) and never collapsed. The exploration\n"
     "  floor gamma keeps every arm alive, so no drift event can permanently\n"
     "  hide an angle the way a locked-on UCB would."
 )
 
 # ---------------------------------------------------------------------------
-# 7. THE CENTREPIECE: a Scale on 12 conversions is refused. At 50, permitted.
+# 7. A Scale on 12 conversions is refused. At 50, permitted.
 #
-# WHY THIS IS WHAT THE SYSTEM IS FOR: both corpora name premature scaling
-# as the way distribution budgets die -- CPA "frequently explode[s] to $150"
-# when an arc is called at 5 conversions. So the gate is not a penalty the
-# planner might out-argue; the move does not exist in the legal action set.
-# Note the refusal carries its SOURCE: an operator told to wait is owed the
-# passage that says so.
+# WHY: both corpora name premature scaling as the way distribution budgets
+# die; CPA "frequently explode[s] to $150" when an arc is called at 5
+# conversions. The gate removes the move from the legal action set instead
+# of penalising it. The refusal carries its source, because an operator
+# told to wait is owed the passage that says so.
 # ---------------------------------------------------------------------------
 
 banner(7, "The evidence gate: refused at 12 conversions, permitted at 50")
@@ -327,10 +325,9 @@ print(f"    reason: {verdict.reason}")
 print(f"    source: {verdict.source}")
 print("  " + "-" * 76)
 print(
-    "\n  The planner CANNOT choose this move at any confidence -- it never\n"
-    "  appears in the legal action set. 'Penalised' would mean the search\n"
-    "  could still pick it on a lucky rollout; 'illegal' means the question\n"
-    "  does not arise."
+    "\n  The planner cannot choose this move at any confidence, because it\n"
+    "  never appears in the legal action set. A penalised move could still\n"
+    "  be picked on a lucky rollout. An illegal one cannot."
 )
 
 # Partial observations never count, no matter how loudly they brag.
@@ -351,9 +348,9 @@ peeking = [
 ]
 counted = settled_count(peeking)
 print(
-    f"\n  And peeking does not help: 100 conversions inside the reporting\n"
-    f"  lag plus 12 settled counts as {counted} -- partials are dropped\n"
-    f"  entirely, not prorated."
+    f"\n  Peeking does not help: 100 conversions inside the reporting lag\n"
+    f"  plus 12 settled counts as {counted}. Partial observations are\n"
+    f"  dropped, never prorated."
 )
 
 print("\n  SAME MOVE, gate cleared: 50 settled conversions in the window.")
@@ -364,10 +361,8 @@ print(f"  PERMITTED ({cleared.rule})")
 print(f"    source: {cleared.source}")
 print("  " + "-" * 76)
 print(
-    "\n  Fifty settled conversions in seven days is one week of receipts.\n"
-    "  The gate did not get easier; the EVIDENCE got better. That is the\n"
-    "  entire contract: the system holds the door until the data, not the\n"
-    "  enthusiasm, walks through it."
+    "\n  Fifty settled conversions in seven days cleared the same gate that\n"
+    "  refused twelve. The gate did not change; the evidence did."
 )
 
 # ---------------------------------------------------------------------------
@@ -375,8 +370,8 @@ print(
 #
 # WHY: everyone read the same benchmark table. Anti-hero rant has the best
 # hook rate in the corpus, so the field piles onto it, and an angle's payoff
-# falls with occupancy. The right question is never "which archetype is
-# best?" but "which archetype is best GIVEN who is already on it?"
+# falls with occupancy. The question that matters is which archetype is
+# best given who is already on it.
 # ---------------------------------------------------------------------------
 
 banner(8, "Congestion: best archetype != best bet")
@@ -411,11 +406,11 @@ for name, value in adjusted:
 assert adjusted[0][0] != "anti_hero_rant", "crowding should dethrone the benchmark king"
 assert adjusted[0][0] == "founder_trauma"
 print(
-    f"\n  anti_hero_rant, the highest raw benchmark, drops to "
-    f"{dict(adjusted)['anti_hero_rant']:.5f} at 0.8 occupancy and LOSES to\n"
-    f"founder_trauma at {dict(adjusted)['founder_trauma']:.5f} -- a lower\n"
+    f"\n  anti_hero_rant, the highest raw benchmark, drops to\n"
+    f"  {dict(adjusted)['anti_hero_rant']:.5f} at 0.8 occupancy and loses to\n"
+    f"  founder_trauma at {dict(adjusted)['founder_trauma']:.5f}, a lower\n"
     "  benchmark nobody crowded. This is why angle choice is modelled as a\n"
-    "  congestion game (Rosenthal 1973) and not a leaderboard."
+    "  congestion game (Rosenthal 1973) rather than a leaderboard."
 )
 
 # ---------------------------------------------------------------------------

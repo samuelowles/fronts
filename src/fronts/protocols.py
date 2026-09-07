@@ -3,8 +3,8 @@
 Everything in this file is a boundary. On one side sits code we wrote; on the
 other sits Python an LLM produced from a natural-language brief and a handful of
 observed trajectories. These protocols are the entire contract between them, and
-they are also -- per the paper -- the regulariser that stops the synthesiser
-from inventing a degenerate representation:
+they are also, per the paper, the regulariser that stops the synthesiser from
+inventing a degenerate representation:
 
     "Instead of a bottleneck, or a regularization term, the game rules and the
     required OpenSpiel API (used in the unit tests) introduced in the context of
@@ -43,7 +43,7 @@ class CodeWorldModel(Protocol):
     class of synthesis error for free.
 
     All methods are deterministic. Randomness enters only through the chance
-    player -- the paper is strict about this and so are we, because a model with
+    player. The paper is strict about this and so are we, because a model with
     hidden nondeterminism cannot be unit-tested against a recorded trajectory.
     """
 
@@ -63,7 +63,7 @@ class CodeWorldModel(Protocol):
     def get_current_player(self, state: State) -> int:
         """Return the player to act.
 
-        ``CHANCE_PLAYER`` (-1) when the next event is a chance draw --
+        ``CHANCE_PLAYER`` (-1) when the next event is a chance draw:
         audience arrival, the virality lottery, attribution noise.
         ``TERMINAL_PLAYER`` (-4) when the horizon is reached.
         """
@@ -73,11 +73,11 @@ class CodeWorldModel(Protocol):
         """Enumerate every legal move, and nothing else.
 
         This method is the paper's verifiability claim made concrete, and in
-        this domain the claim is unusually load-bearing. An illegal move here is
-        not a forfeited game -- it is an unsubstantiated health claim, an
-        undisclosed paid endorsement, or a budget commitment made on five
-        conversions. The planner can only select from what this returns, so
-        anything this method excludes is a mistake the system cannot make.
+        this domain it carries real weight. An illegal move here is an
+        unsubstantiated health claim, an undisclosed paid endorsement, or a
+        budget commitment made on five conversions. The planner can only
+        select from what this returns, so anything this method excludes is a
+        mistake the system cannot make.
         """
         ...
 
@@ -118,10 +118,9 @@ class HistoryInference(Protocol):
     replaying the sampled history through the CWM must reproduce every
     observation actually seen.
 
-    That guarantee is weaker than it sounds and stronger than it looks. It does
-    not put the sample at the right *density*. It does put it inside the
-    posterior's *support*, and the paper's argument for why that is enough
-    applies verbatim to distribution:
+    The guarantee places the sample inside the posterior's support without
+    placing it at the right density, and the paper's argument for why support
+    membership is enough applies to distribution:
 
         "Although this does not guarantee that s_t is correctly distributed, the
          correct support is already very informative, given the extremely sparse
@@ -143,10 +142,9 @@ class StateInference(Protocol):
 
     Cheaper and less safe than history inference: it ignores the dependency
     between consecutive states, so it can produce a state that is not reachable
-    at all. We use it anyway, because closed deck is the honest description of
-    organic distribution -- you see your analytics and nothing else. You do not
-    get to inspect the ranking function, and you certainly do not get to see
-    which angles your competitors tested and killed last week.
+    at all. We use it anyway, because closed deck is the accurate description
+    of organic distribution. You see your analytics and nothing else; the
+    ranking function and your competitors' test schedules stay hidden.
     """
 
     def resample_state(

@@ -1,14 +1,13 @@
 """Operator configuration: TOML in, one validated object out.
 
 Everything the game and solver layers need that is not a corpus constant is
-an operator input, and every operator input lives here -- unit economics,
+an operator input, and every operator input lives here: unit economics,
 legality thresholds, platform credentials, file locations, and the two
-MEASURED attribution numbers nothing else in the system is permitted to
-guess. A config file is the right home for all of it because the honest
-answer to "why is your creative-judgement gate at 50?" is a citation, and
-the honest answer to "why is your attribution coverage 0.72?" is "I
-measured it, on this date, with this method" -- both belong in a file the
-operator owns, not in code.
+measured attribution numbers nothing else in the system is permitted to
+guess. A config file is the right home for all of it. The answer to "why is
+your creative-judgement gate at 50?" is a citation, and the answer to "why
+is your attribution coverage 0.72?" is "I measured it, on this date, with
+this method". Both belong in a file the operator owns, not in code.
 
 The parser is ``tomllib``, standard since Python 3.11. On an older
 interpreter ``load`` raises an error naming the required version rather
@@ -19,7 +18,7 @@ dates, dotted keys) is far worse than a clear "upgrade Python".
 Note on the ``tomli`` backport: it is accepted as a drop-in when already
 present (any environment running pytest on Python 3.10 has it, since pytest
 itself depends on it there), which keeps the CLI usable for 3.10
-contributors without adding a dependency -- the package still imports, and
+contributors without adding a dependency. The package still imports, and
 still requires nothing installed.
 """
 
@@ -41,9 +40,9 @@ __all__ = ["Paths", "FrontsConfig", "load", "example", "default_config"]
 @dataclass(frozen=True, slots=True)
 class Paths:
     """Where the loop's artefacts live. Relative paths resolve against the
-    working directory the command runs from -- deliberately simple, because
-    a config that silently rebased paths against the config file's own
-    location would work until the first cron job ran from elsewhere."""
+    working directory the command runs from, deliberately, because a config
+    that silently rebased paths against the config file's own location
+    would work until the first cron job ran from elsewhere."""
 
     history: Path = Path("data/trajectories.jsonl")
     """Recorded moves and observations; what ``synth`` learns from."""
@@ -65,11 +64,11 @@ class Paths:
 class FrontsConfig:
     """The whole operator configuration in one object.
 
-    ``attribution_coverage`` and ``incrementality`` are MEASUREMENTS, not
+    ``attribution_coverage`` and ``incrementality`` are measurements, not
     settings: the fraction of true conversions your tracking can see, and
     the fraction of attributed conversions you actually caused. Neither is
     derivable from any API, both default to ``None``, and the adapter
-    refuses to build an ``Observation`` while either is unset -- see
+    refuses to build an ``Observation`` while either is unset. See
     ``fronts.adapters.composio_io.MissingMeasurementError`` and
     docs/OPERATING.md before setting them by anything other than a holdout
     or a survey reconciliation.
@@ -92,7 +91,7 @@ def default_config() -> FrontsConfig:
     corpus-default policy knob.
 
     The economics are the worked example from ``fronts.game.payoff``'s tests
-    (ARPU 100, margin 0.8, churn 0.08 -- LTV 1000), carried in
+    (ARPU 100, margin 0.8, churn 0.08, LTV 1000), carried in
     ``ReferenceConfig`` for the same reason: they reproduce a documented
     example, they are not a claim about any real business. The two
     measurements stay ``None``; there is no worked example for a number you
@@ -112,9 +111,9 @@ def default_config() -> FrontsConfig:
 def _toml_parser() -> Any:
     """Resolve tomllib (3.11+) or the tomli backport, lazily.
 
-    Imported inside this function, not at module level, so importing
-    ``fronts.config`` -- and everything downstream, including the CLI --
-    succeeds on a machine with no TOML library installed at all; only
+    Imported inside this function rather than at module level, so importing
+    ``fronts.config`` (and everything downstream, including the CLI)
+    succeeds on a machine with no TOML library installed at all. Only
     actually loading a file requires one.
     """
     try:
@@ -210,7 +209,7 @@ def load(path: str | Path) -> FrontsConfig:
     """Load and validate a config file.
 
     Every section is optional; anything absent keeps its default, and the
-    two measurements default to unset -- a config that loads cleanly with
+    two measurements default to unset. A config that loads cleanly with
     no ``[measurement]`` section is a config whose ingest will refuse to
     guess, which is the designed behaviour and not a misconfiguration.
     """
@@ -273,7 +272,7 @@ briefs   = "data/briefs.json"          # written by `brief`
 
 [economics]
 # YOUR unit economics, per paying user per month. The reward the planner
-# maximises is contribution margin computed from these -- see
+# maximises is contribution margin computed from these; see
 # src/fronts/game/payoff.py for what each field does to it.
 arpu_monthly      = 100.0    # revenue per paying user per month
 gross_margin      = 0.8      # after cost of service
@@ -306,13 +305,13 @@ text_thread = 5
 
 [composio]
 # Platform I/O via Composio (https://composio.dev). The api key is read
-# from COMPOSIO_API_KEY when api_key is unset -- prefer the environment;
+# from COMPOSIO_API_KEY when api_key is unset. Prefer the environment;
 # keys in files get committed.
 # api_key         = "cs_..."
 user_id          = "user-123"
 max_retries      = 3
 # Action slugs are UNVERIFIED against a live account (see
-# ToolkitRegistry). When a real slug differs, override it here -- no code
+# ToolkitRegistry). When a real slug differs, override it here; no code
 # change needed. Keys are "publish:<platform>" / "analytics:<platform>".
 # slug_overrides = { "publish:x" = "X_CREATE_POST" }
 
@@ -322,8 +321,8 @@ max_retries      = 3
 destination_url = "https://example.com/pricing"
 
 [measurement]
-# THE TWO NUMBERS NOTHING ELSE CAN SUPPLY. Leave commented out until you
-# have measured them -- docs/OPERATING.md, "The thing that will bite you".
+# The two numbers nothing else can supply. Leave commented out until you
+# have measured them; docs/OPERATING.md, "The thing that will bite you".
 # Until they are set, ingest refuses to build observations rather than
 # guessing, and the legality engine keeps every angle unjudgeable.
 #
