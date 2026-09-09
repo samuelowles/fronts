@@ -13,25 +13,31 @@
   <a href="https://arxiv.org/abs/2510.04542"><img alt="arXiv 2510.04542" src="https://img.shields.io/badge/arXiv-2510.04542-b31b1b.svg"></a>
 </p>
 
+---
+
 Most AI marketing tools ask a language model to write your content. `fronts`
 gives it a narrower job: read your posting history and write a simulator of
 your distribution environment. Planning then happens inside that simulator
-with Information Set MCTS, the same family of search that plays poker. The
-language model is never called while a plan is being computed.
+with Information Set MCTS, the same family of search that plays poker. **The
+language model is never called while a plan is being computed.**
 
 The method comes from [*Code World Models for General Game
 Playing*](https://arxiv.org/abs/2510.04542) (Lehrach et al., Google DeepMind,
 2025). This repository applies it to a domain the paper does not cover.
 
----
-
-## Why
+## Why a model should not be your policy
 
 Used as a policy, a language model picks moves by pattern-matching, and the
 paper is blunt about how that goes: "frequent illegal moves and strategically
 shallow play." In a board game an illegal move loses the game. In distribution
-it is an unsubstantiated FTC claim, an undisclosed AI face on TikTok, or budget
-committed on five conversions of evidence.
+it is an unsubstantiated FTC claim, an undisclosed AI face on TikTok, or
+budget committed on five conversions of evidence.
+
+The failure that motivated this repository is subtler, and it is the one
+optimisers walk into confidently. In the corpus behind the priors, a
+**$30-CAC channel produced 45% three-month churn at $250 LTV, while a
+$65-CAC channel produced 8% churn at $1,200 LTV.** A system built to minimise
+CAC picks the wrong channel — and grows more confident as the data piles up.
 
 So the model gets a different job. You hand it your platform policies in prose
 and a few dozen posts with the metrics that came back. It writes a Python
@@ -46,33 +52,28 @@ algorithm drifts (EXP3 rather than UCB). The platform commits before you move
 (Stackelberg). A claim persuades only when it is expensive to fake (Spence).
 All five solvers ship with the repository and run with no model at all.
 
-## The rules that matter
+## Three rules that do the work
 
-The reward is paying users, not reach. Reach shows up in the observation
+The reward is paying users, not reach. Reach appears in the observation
 because a hook rate under 25% means the platform stopped serving your asset,
-but it never enters the reward. The corpus behind the priors records why this
-matters: a $30-CAC channel produced 45% three-month churn at $250 LTV, while a
-$65-CAC channel produced 8% churn at $1,200 LTV. A system built to minimise
-CAC picks the wrong channel and grows more confident as the data piles up.
+but it never enters the reward.
 
-Premature scaling is illegal rather than penalised. Calling an angle a winner
-takes 50 settled conversions in a trailing 7-day window. Moving budget takes
-300 conversions over 14 days. Anything still inside the 24-72 hour reporting
-lag counts for zero. The planner cannot pick a gated move at any level of
-confidence, because the move never enters the legal action set.
+Premature scaling is illegal rather than penalised. Calling an angle a
+winner takes 50 settled conversions in a trailing 7-day window. Moving budget
+takes 300 conversions over 14 days. Anything still inside the 24–72 hour
+reporting lag counts for zero. The planner cannot pick a gated move at any
+level of confidence, because the move never enters the legal action set.
 
-Low attribution coverage makes an angle unjudgeable. Below the coverage floor,
-`Scale` and `Kill` are both illegal: when most of the data is missing you may
-not conclude an angle is winning, and you may not conclude it is losing
-either. Operators get this one wrong in the confident direction.
+Low attribution coverage makes an angle unjudgeable. Below the coverage
+floor, `Scale` and `Kill` are both illegal: when most of the data is missing
+you may not conclude an angle is winning, and you may not conclude it is
+losing either. Operators get this one wrong in the confident direction.
 
 Every threshold carries a citation. `game/priors.py` names the source file for
-each number, and the self-check fails if one is missing. The sources are two
+each number and the self-check fails if one is missing. The sources are two
 private operator corpora, so a citation gives you provenance rather than
 independent verification. Treat the numbers as a starting prior and replace
 them once you have settled history of your own.
-
----
 
 ## Architecture
 
@@ -109,9 +110,7 @@ them once you have settled history of your own.
                                        +-->  new trajectories, back to the top
 ```
 
----
-
-## Status
+## Read this before you install
 
 > [!WARNING]
 > **`fronts` executes Python that a language model wrote.** The first sandbox
@@ -142,7 +141,7 @@ pip install -e .                       # core: zero dependencies
 python examples/walkthrough.py         # the whole loop, no keys needed
 ```
 
-Provider SDKs are optional extras, only needed for a real synthesis run:
+Provider SDKs are optional extras, needed only for a real synthesis run:
 
 ```bash
 pip install -e ".[all]"                # Anthropic / OpenAI / Composio
@@ -151,13 +150,11 @@ pip install -e ".[all]"                # Anthropic / OpenAI / Composio
 The game, world-model and solver layers use only the standard library, so the
 planner runs anywhere Python runs.
 
----
-
 ## See it run
 
 The walkthrough needs no API keys and no network. It finishes in under half a
-minute and prints the same numbers on every run. Three excerpts from its
-output, quoted verbatim.
+minute and prints the same numbers on every run. Three excerpts, quoted
+verbatim.
 
 Tests generated from a model's own history score a perfect 1.00 against that
 model. That check is what makes every later accuracy reading meaningful:
@@ -220,9 +217,7 @@ each other inside them, and rejects any strategy that loses by more than 10%
 of the observed utility range. That filtering happens before you commit a day
 of real output to a plan.
 
----
-
-## Limitations
+## What it is known to get wrong
 
 The reference paper's worst result is Gin rummy: 0.78 train and 0.75 test
 transition accuracy after a 500-call synthesis budget, and a heavy loss to a
@@ -240,11 +235,9 @@ docstring.
 One more caveat. `fronts synth` writes a state-inference sampler beside the
 world model, `fronts plan` determinizes with it when it loads (and prints
 `open-loop` when it does not), and `fronts accuracy` scores it. That score
-certifies the samples are consistent with your observations, not that they
-are drawn from the right distribution. A plan under the sampler is better
+certifies the samples are consistent with your observations, not that they are
+drawn from the right distribution. A plan under the sampler is better
 informed, not clairvoyant.
-
----
 
 ## Documentation
 
@@ -256,6 +249,4 @@ informed, not clairvoyant.
 
 ---
 
-## Licence
-
-MIT.
+MIT licensed.
